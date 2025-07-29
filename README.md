@@ -1,61 +1,261 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# 🛒 Sistema de Vendas
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Um sistema completo de gerenciamento de vendas desenvolvido em Laravel 12 com design moderno e responsivo.
 
-## About Laravel
+## ✨ Funcionalidades
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+### 🔐 Autenticação
+- ✅ Login e registro de usuários
+- ✅ Recuperação de senha
+- ✅ Perfil do usuário
+- ✅ Alteração de senha
+- ✅ Exclusão de conta
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### 👥 Clientes
+- ✅ Cadastro de clientes
+- ✅ Listagem com busca e filtros
+- ✅ Edição de dados
+- ✅ Visualização detalhada
+- ✅ Exclusão de clientes
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### 🛍️ Vendas
+- ✅ Criação de vendas
+- ✅ Itens de venda
+- ✅ Cálculo automático de valores
+- ✅ Status de vendas
+- ✅ Histórico de vendas
 
-## Learning Laravel
+### 💳 Tipos de Pagamento
+- ✅ Cadastro de tipos de pagamento
+- ✅ Configuração de métodos
+- ✅ Status ativo/inativo
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+### 📅 Parcelas
+- ✅ Gerenciamento de parcelas
+- ✅ Controle de vencimentos
+- ✅ Marcação de pagamento
+- ✅ Status de parcelas
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+### 📄 PDF
+- ✅ Geração de relatórios
+- ✅ Download de documentos
+- ✅ Templates personalizáveis
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## 🚀 Instalação
 
-## Laravel Sponsors
+### Pré-requisitos
+- PHP 8.2 ou superior
+- Composer
+- MySQL/PostgreSQL
+- Node.js (opcional, para assets)
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### Passos de Instalação
 
-### Premium Partners
+1. **Clone o repositório**
+```bash
+git clone <url-do-repositorio>
+cd freelas_dc
+```
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+2. **Instale as dependências**
+```bash
+composer install
+```
 
-## Contributing
+3. **Configure o ambiente**
+```bash
+cp .env.example .env
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+4. **Configure o banco de dados no arquivo .env**
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=freelas_dc
+DB_USERNAME=root
+DB_PASSWORD=
+```
 
-## Code of Conduct
+5. **Execute a instalação automática**
+```bash
+php artisan system:install
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### Instalação Manual (Alternativa)
 
-## Security Vulnerabilities
+Se preferir instalar manualmente:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+# Gerar chave da aplicação
+php artisan key:generate
 
-## License
+# Executar migrações
+php artisan migrate:fresh
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+# Executar seeders
+php artisan db:seed
+
+# Limpar cache
+php artisan config:clear
+php artisan cache:clear
+php artisan view:clear
+php artisan route:clear
+```
+
+## 🔑 Credenciais Padrão
+
+Após a instalação, você pode acessar o sistema com:
+
+**Administrador:**
+- Email: `admin@admin.com`
+- Senha: `password`
+
+**Usuário Teste:**
+- Email: `user@test.com`
+- Senha: `password`
+
+## 🌐 Acesso
+
+Após a instalação, acesse:
+```
+http://localhost:8000
+```
+
+## 📱 Funcionalidades do Sistema
+
+### Dashboard
+- Visão geral das vendas
+- Estatísticas em tempo real
+- Ações rápidas
+- Atividades recentes
+
+### Gestão de Clientes
+- Cadastro completo com endereço
+- Busca e filtros avançados
+- Histórico de compras
+- Dados de contato
+
+### Controle de Vendas
+- Criação de vendas com múltiplos itens
+- Cálculo automático de impostos e descontos
+- Controle de status
+- Histórico completo
+
+### Sistema de Parcelas
+- Criação automática de parcelas
+- Controle de vencimentos
+- Marcação de pagamento
+- Relatórios de inadimplência
+
+### Tipos de Pagamento
+- Configuração flexível
+- Múltiplos métodos
+- Status ativo/inativo
+- Relatórios por método
+
+## 🎨 Design
+
+- **Design Moderno**: Interface limpa e profissional
+- **Responsivo**: Funciona em todos os dispositivos
+- **Animações**: Transições suaves e efeitos visuais
+- **Acessibilidade**: Navegação por teclado e leitores de tela
+- **UX/UI**: Experiência do usuário otimizada
+
+## 🛠️ Tecnologias
+
+- **Backend**: Laravel 12
+- **Frontend**: Bootstrap 5, jQuery
+- **Banco de Dados**: MySQL/PostgreSQL
+- **Autenticação**: Laravel Auth
+- **Validação**: Form Requests
+- **Design**: CSS3, Font Awesome
+
+## 📁 Estrutura do Projeto
+
+```
+freelas_dc/
+├── app/
+│   ├── Http/
+│   │   ├── Controllers/     # Controladores
+│   │   ├── Requests/        # Validações
+│   │   └── Middleware/      # Middlewares
+│   ├── Models/              # Modelos
+│   └── Console/Commands/    # Comandos Artisan
+├── database/
+│   ├── migrations/          # Migrações
+│   └── seeders/            # Seeders
+├── resources/
+│   └── views/              # Views Blade
+│       ├── auth/           # Autenticação
+│       ├── clients/        # Clientes
+│       ├── sells/          # Vendas
+│       ├── installments/   # Parcelas
+│       └── layouts/        # Layouts
+└── routes/
+    └── web.php             # Rotas web
+```
+
+## 🔧 Comandos Úteis
+
+```bash
+# Instalar sistema
+php artisan system:install
+
+# Limpar cache
+php artisan cache:clear
+
+# Executar migrações
+php artisan migrate
+
+# Executar seeders
+php artisan db:seed
+
+# Listar rotas
+php artisan route:list
+
+# Servidor de desenvolvimento
+php artisan serve
+```
+
+## 📊 Banco de Dados
+
+O sistema inclui as seguintes tabelas:
+
+- `users` - Usuários do sistema
+- `clients` - Clientes
+- `type_payments` - Tipos de pagamento
+- `sells` - Vendas
+- `sell_items` - Itens de venda
+- `installments` - Parcelas
+
+## 🔒 Segurança
+
+- Autenticação segura
+- Validação de dados
+- Proteção CSRF
+- Senhas criptografadas
+- Middleware de autenticação
+
+## 🚀 Deploy
+
+Para fazer deploy em produção:
+
+1. Configure o ambiente de produção
+2. Execute as migrações
+3. Configure o servidor web
+4. Configure o cache e otimizações
+
+## 📞 Suporte
+
+Para suporte ou dúvidas:
+- Abra uma issue no repositório
+- Entre em contato com o desenvolvedor
+
+## 📄 Licença
+
+Este projeto está sob a licença MIT.
+
+---
+
+**Desenvolvido com ❤️ usando Laravel 12**
