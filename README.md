@@ -160,3 +160,4 @@ docker-compose down -v
 Para suporte ou dúvidas:
 - 📧 Abra uma issue no repositório
 - 📧 Entre em contato com o desenvolvedor
+gustavohsantos2009@hotmail.com
