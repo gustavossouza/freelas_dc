@@ -81,59 +81,11 @@ class Sell extends Model
     }
 
     /**
-     * Scope a query to only include pending sells.
-     */
-    public function scopePending($query)
-    {
-        return $query->where('status', 'pending');
-    }
-
-    /**
-     * Scope a query to only include completed sells.
-     */
-    public function scopeCompleted($query)
-    {
-        return $query->where('status', 'completed');
-    }
-
-    /**
-     * Scope a query to only include cancelled sells.
-     */
-    public function scopeCancelled($query)
-    {
-        return $query->where('status', 'cancelled');
-    }
-
-    /**
-     * Scope a query to only include sells with pending payment.
-     */
-    public function scopePendingPayment($query)
-    {
-        return $query->where('payment_status', 'pending');
-    }
-
-    /**
-     * Scope a query to only include sells with paid payment.
-     */
-    public function scopePaid($query)
-    {
-        return $query->where('payment_status', 'paid');
-    }
-
-    /**
      * Get the subtotal amount (before discount and tax).
      */
     public function getSubtotalAttribute()
     {
         return $this->sellItems()->sum('total_price');
-    }
-
-    /**
-     * Get the final amount (after discount and tax).
-     */
-    public function getFinalAmountAttribute()
-    {
-        return $this->subtotal - $this->discount + $this->tax;
     }
 
     /**
@@ -150,14 +102,6 @@ class Sell extends Model
     public function getFormattedDiscountAttribute()
     {
         return 'R$ ' . number_format($this->discount, 2, ',', '.');
-    }
-
-    /**
-     * Get the formatted tax.
-     */
-    public function getFormattedTaxAttribute()
-    {
-        return 'R$ ' . number_format($this->tax, 2, ',', '.');
     }
 
     /**

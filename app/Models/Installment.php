@@ -75,22 +75,6 @@ class Installment extends Model
     }
 
     /**
-     * Scope a query to only include installments due this week.
-     */
-    public function scopeDueThisWeek($query)
-    {
-        return $query->whereBetween('due_date', [now()->startOfWeek(), now()->endOfWeek()]);
-    }
-
-    /**
-     * Scope a query to only include installments due this month.
-     */
-    public function scopeDueThisMonth($query)
-    {
-        return $query->whereBetween('due_date', [now()->startOfMonth(), now()->endOfMonth()]);
-    }
-
-    /**
      * Get the formatted amount.
      */
     public function getFormattedAmountAttribute()
@@ -146,14 +130,6 @@ class Installment extends Model
     public function isDueToday()
     {
         return $this->due_date->isToday() && $this->status === 'pending';
-    }
-
-    /**
-     * Check if the installment is due this week.
-     */
-    public function isDueThisWeek()
-    {
-        return $this->due_date->between(now()->startOfWeek(), now()->endOfWeek()) && $this->status === 'pending';
     }
 
     /**
@@ -244,36 +220,5 @@ class Installment extends Model
     public function getFormattedSellTotalAttribute()
     {
         return 'R$ ' . number_format($this->sell_total, 2, ',', '.');
-    }
-
-    /**
-     * Check if this is the last installment.
-     */
-    public function isLastInstallment()
-    {
-        $totalInstallments = $this->sell->installments()->count();
-        return $this->installment_number === $totalInstallments;
-    }
-
-    /**
-     * Get the next installment.
-     */
-    public function getNextInstallmentAttribute()
-    {
-        return $this->sell->installments()
-            ->where('installment_number', '>', $this->installment_number)
-            ->orderBy('installment_number')
-            ->first();
-    }
-
-    /**
-     * Get the previous installment.
-     */
-    public function getPreviousInstallmentAttribute()
-    {
-        return $this->sell->installments()
-            ->where('installment_number', '<', $this->installment_number)
-            ->orderBy('installment_number', 'desc')
-            ->first();
     }
 } 

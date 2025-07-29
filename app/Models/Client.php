@@ -37,13 +37,7 @@ class Client extends Model
         return $this->hasManyThrough(Installment::class, Sell::class);
     }
 
-    /**
-     * Scope a query to only include active clients.
-     */
-    public function scopeActive($query)
-    {
-        return $query->where('is_active', true);
-    }
+
 
     /**
      * Get the formatted phone number.
