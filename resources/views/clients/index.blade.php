@@ -414,9 +414,14 @@ function deleteClient(clientId) {
     
     $.ajax({
         url: `/clients/${clientId}`,
-        method: 'DELETE',
+        method: 'POST',
+        data: {
+            _method: 'DELETE',
+            _token: $('meta[name="csrf-token"]').attr('content')
+        },
         headers: {
-            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+            'Accept': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded'
         },
         success: function(response) {
             hideLoading();
@@ -435,7 +440,13 @@ function deleteClient(clientId) {
             
             if (xhr.responseJSON && xhr.responseJSON.message) {
                 errorMessage = xhr.responseJSON.message;
+            } else if (xhr.status === 405) {
+                errorMessage = 'Método não permitido. Tente novamente.';
+            } else if (xhr.status === 404) {
+                errorMessage = 'Cliente não encontrado.';
             }
+            
+            console.error('Erro na exclusão:', xhr);
             
             Swal.fire({
                 title: 'Erro!',

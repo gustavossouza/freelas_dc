@@ -799,11 +799,40 @@ function confirmDeleteSell(sellId, clientName) {
 function deleteSell(sellId) {
     showLoading();
     
+    // Criar um formulário temporário para simular DELETE
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/sells/${sellId}`;
+    form.style.display = 'none';
+    
+    // Adicionar campo _method para simular DELETE
+    const methodField = document.createElement('input');
+    methodField.type = 'hidden';
+    methodField.name = '_method';
+    methodField.value = 'DELETE';
+    form.appendChild(methodField);
+    
+    // Adicionar CSRF token
+    const csrfField = document.createElement('input');
+    csrfField.type = 'hidden';
+    csrfField.name = '_token';
+    csrfField.value = $('meta[name="csrf-token"]').attr('content');
+    form.appendChild(csrfField);
+    
+    // Adicionar ao DOM e submeter
+    document.body.appendChild(form);
+    
+    // Fazer requisição AJAX POST com _method=DELETE
     $.ajax({
         url: `/sells/${sellId}`,
-        method: 'DELETE',
+        method: 'POST',
+        data: {
+            _method: 'DELETE',
+            _token: $('meta[name="csrf-token"]').attr('content')
+        },
         headers: {
-            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+            'Accept': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded'
         },
         success: function(response) {
             hideLoading();
@@ -822,7 +851,13 @@ function deleteSell(sellId) {
             
             if (xhr.responseJSON && xhr.responseJSON.message) {
                 errorMessage = xhr.responseJSON.message;
+            } else if (xhr.status === 405) {
+                errorMessage = 'Método não permitido. Tente novamente.';
+            } else if (xhr.status === 404) {
+                errorMessage = 'Venda não encontrada.';
             }
+            
+            console.error('Erro na exclusão:', xhr);
             
             Swal.fire({
                 title: 'Erro!',
@@ -832,6 +867,9 @@ function deleteSell(sellId) {
             });
         }
     });
+    
+    // Remover formulário temporário
+    document.body.removeChild(form);
 }
 
 function approvePayment(sellId, clientName) {

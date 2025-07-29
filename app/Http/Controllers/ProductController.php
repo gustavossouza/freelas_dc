@@ -114,14 +114,30 @@ class ProductController extends Controller
         try {
             // Check if product has associated sell items
             if ($product->sellItems()->count() > 0) {
+                if (request()->expectsJson()) {
+                    return response()->json([
+                        'message' => 'Não é possível excluir um produto que possui vendas associadas.'
+                    ], 400);
+                }
                 return back()->with('error', 'Não é possível excluir um produto que possui vendas associadas.');
             }
 
             $product->delete();
 
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'message' => 'Produto excluído com sucesso!'
+                ]);
+            }
+
             return redirect()->route('products.index')
                 ->with('success', 'Produto excluído com sucesso!');
         } catch (\Exception $e) {
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'message' => 'Erro ao excluir produto: ' . $e->getMessage()
+                ], 500);
+            }
             return back()->with('error', 'Erro ao excluir produto: ' . $e->getMessage());
         }
     }

@@ -234,25 +234,28 @@ class SellController extends Controller
         try {
             DB::beginTransaction();
 
-            // Restore product stock
-            foreach ($sell->sellItems as $item) {
-                if ($item->product_id) {
-                    $product = \App\Models\Product::find($item->product_id);
-                    if ($product) {
-                        $product->increment('stock_quantity', $item->quantity);
-                    }
-                }
-            }
-
             // Delete sell (this will cascade delete items and installments)
             $sell->delete();
 
             DB::commit();
 
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'message' => 'Venda excluída com sucesso!'
+                ]);
+            }
+
             return redirect()->route('sells.index')
                 ->with('success', 'Venda excluída com sucesso!');
         } catch (\Exception $e) {
             DB::rollBack();
+            
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'message' => 'Erro ao excluir venda: ' . $e->getMessage()
+                ], 500);
+            }
+
             return back()->with('error', 'Erro ao excluir venda: ' . $e->getMessage());
         }
     }

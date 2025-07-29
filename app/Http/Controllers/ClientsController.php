@@ -132,14 +132,30 @@ class ClientsController extends Controller
         try {
             // Check if client has associated sells
             if ($client->sells()->count() > 0) {
+                if (request()->expectsJson()) {
+                    return response()->json([
+                        'message' => 'Não é possível excluir um cliente que possui vendas associadas.'
+                    ], 400);
+                }
                 return back()->with('error', 'Não é possível excluir um cliente que possui vendas associadas.');
             }
 
             $client->delete();
 
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'message' => 'Cliente excluído com sucesso!'
+                ]);
+            }
+
             return redirect()->route('clients.index')
                 ->with('success', 'Cliente excluído com sucesso!');
         } catch (\Exception $e) {
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'message' => 'Erro ao excluir cliente: ' . $e->getMessage()
+                ], 500);
+            }
             return back()->with('error', 'Erro ao excluir cliente: ' . $e->getMessage());
         }
     }
