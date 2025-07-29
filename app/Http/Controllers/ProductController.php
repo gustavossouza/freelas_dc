@@ -15,7 +15,8 @@ class ProductController extends Controller
     public function index()
     {
         try {
-            $products = Product::orderBy('name')
+            $products = Product::
+                orderBy('name')
                 ->paginate(15);
 
             $totalProducts = Product::count();
