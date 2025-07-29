@@ -19,7 +19,7 @@ class ProductController extends Controller
                 ->paginate(15);
 
             $totalProducts = Product::count();
-            $activeProducts = Product::active()->count();
+            $activeProducts = Product::where('is_active', true)->count();
             $outOfStockProducts = Product::where('stock_quantity', 0)->count();
 
             return view('products.index', compact(
@@ -133,7 +133,8 @@ class ProductController extends Controller
         try {
             $search = $request->get('search');
             
-            $products = Product::active()
+            $products = Product::
+                where('is_active', true)
                 ->when($search, function ($query) use ($search) {
                     $query->where(function ($q) use ($search) {
                         $q->where('name', 'like', "%{$search}%");
@@ -155,7 +156,7 @@ class ProductController extends Controller
     public function getProductDetails($id)
     {
         try {
-            $product = Product::active()
+            $product = Product::where('is_active', true)
                 ->select('id', 'name', 'sku', 'price', 'stock_quantity', 'unit', 'description')
                 ->findOrFail($id);
 
