@@ -41,7 +41,7 @@ docker-compose up -d --build
 ### 4. Instale as Dependências
 ```bash
 # Acesse o container da aplicação
-docker-compose exec app bash
+docker-compose exec freelas_dev bash
 
 # Instale as dependências PHP
 composer install
