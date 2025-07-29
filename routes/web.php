@@ -7,7 +7,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ClientsController;
 use App\Http\Controllers\SellController;
 use App\Http\Controllers\ProductController;
-use App\Http\Controllers\TypePaymentController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InstallmentController;
 use App\Http\Controllers\PdfController;
 
@@ -27,9 +27,7 @@ Route::get('/me', [LoginController::class, 'me'])->name('me');
 Route::middleware(['auth'])->group(function () {
     
     // Dashboard
-    Route::get('/dashboard', function () {
-        return view('dashboard');
-    })->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     
     // Rotas de Clientes
     Route::resource('clients', ClientsController::class);
