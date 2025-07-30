@@ -318,6 +318,13 @@
                             Editar Parcelas
                         </button>
                     </div>
+                    <!-- Difference Alert -->
+                    <div id="sidebarDifferenceAlert" class="alert alert-warning mt-2" style="display: none;">
+                        <small>
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            <span id="sidebarDifferenceText"></span>
+                        </small>
+                    </div>
                 </div>
                 
 
@@ -405,6 +412,10 @@
                             <button type="button" class="btn btn-outline-primary" onclick="recalculateInstallments()">
                                 <i class="fas fa-calculator me-2"></i>
                                 Recalcular
+                            </button>
+                            <button type="button" class="btn btn-outline-warning" onclick="autoFixDifference()" id="autoFixBtn" style="display: none;">
+                                <i class="fas fa-magic me-2"></i>
+                                Corrigir Diferença
                             </button>
                             <button type="button" class="btn btn-outline-secondary" onclick="resetManualEdits()">
                                 <i class="fas fa-undo me-2"></i>
@@ -563,6 +574,51 @@
         background-color: rgba(0, 123, 255, 0.05);
     }
     
+    /* Estilos para diferenças nas parcelas */
+    .installment-amount.border-warning {
+        border-color: #ffc107 !important;
+        box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
+        animation: pulse-warning 2s infinite;
+    }
+    
+    .installment-amount.border-danger {
+        border-color: #dc3545 !important;
+        box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+        animation: pulse-danger 2s infinite;
+    }
+    
+    @keyframes pulse-warning {
+        0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.25); }
+        70% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+    }
+    
+    @keyframes pulse-danger {
+        0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.25); }
+        70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+    }
+    
+    .modal-content.border-warning {
+        border-color: #ffc107 !important;
+        box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
+    }
+    
+    #tempDifferenceAlert {
+        animation: slideInDown 0.3s ease-out;
+    }
+    
+    @keyframes slideInDown {
+        from {
+            transform: translateY(-100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+    
     /* Select2 custom styles */
     .select2-container {
         width: 100% !important;
@@ -684,6 +740,31 @@ $(document).ready(function() {
     // Auto-fill common fields
     autoFillCommonFields();
     
+    // Add real-time validation for installment amounts
+    $(document).on('input', '.installment-amount', function() {
+        const index = $(this).closest('tr').index();
+        const value = parseFloat($(this).val()) || 0;
+        
+        if (value !== installmentsData[index].amount) {
+            updateInstallmentAmount(index, value);
+        }
+    });
+    
+    // Add real-time validation for installment amounts with debounce
+    let debounceTimer;
+    $(document).on('input', '.installment-amount', function() {
+        clearTimeout(debounceTimer);
+        const input = $(this);
+        const index = input.closest('tr').index();
+        
+        debounceTimer = setTimeout(() => {
+            const value = parseFloat(input.val()) || 0;
+            if (value !== installmentsData[index].amount) {
+                updateInstallmentAmount(index, value);
+            }
+        }, 300); // 300ms delay
+    });
+    
     // Show installments field if there are existing installments
     if (existingInstallments && existingInstallments.length > 1) {
         $('#installmentsField').show();
@@ -720,9 +801,60 @@ $(document).ready(function() {
             installmentsData = [];
             updateInstallmentsTable();
             updateModalSummary();
+        } else if (installments > 1 && total > 0 && installmentsData.length > 0) {
+            // Se já existem parcelas e a quantidade mudou, recalcular
+            const oldCount = installmentsData.length;
+            
+            if (installments > oldCount) {
+                // Adicionar parcelas
+                const baseAmount = total / installments;
+                const lastDueDate = new Date(installmentsData[oldCount - 1].dueDate);
+                
+                for (let i = oldCount + 1; i <= installments; i++) {
+                    lastDueDate.setMonth(lastDueDate.getMonth() + 1);
+                    
+                    installmentsData.push({
+                        number: i,
+                        amount: baseAmount,
+                        dueDate: lastDueDate.toISOString().split('T')[0],
+                        manuallyEdited: false
+                    });
+                }
+                
+                // Recalcular todas as parcelas para distribuir o valor corretamente
+                recalculateInstallments();
+            } else if (installments < oldCount) {
+                // Remover parcelas (manter as primeiras)
+                installmentsData = installmentsData.slice(0, installments);
+                
+                // Renumerar e recalcular
+                installmentsData.forEach((installment, index) => {
+                    installment.number = index + 1;
+                });
+                
+                recalculateInstallments();
+            }
         }
         
         updateInstallmentsSummary();
+        
+        // Validate if changing installments affects the total
+        if (installmentsData.length > 0) {
+            const installmentsTotal = installmentsData.reduce((sum, installment) => sum + installment.amount, 0);
+            const difference = Math.abs(total - installmentsTotal);
+            
+            if (difference > 0.01) {
+                // Mostrar notificação mais sutil
+                const statusText = total > installmentsTotal ? 'Faltam' : 'Sobram';
+                showTemporaryDifferenceAlert(difference, statusText);
+                
+                // Atualizar o resumo das parcelas com alerta visual
+                const installmentsInfo = $('#installmentsInfo');
+                let infoText = installmentsData.length + 'x - Total: R$ ' + installmentsTotal.toFixed(2).replace('.', ',');
+                infoText += ' <span class="text-warning"><i class="fas fa-exclamation-triangle"></i> ' + statusText + ': R$ ' + difference.toFixed(2).replace('.', ',') + '</span>';
+                installmentsInfo.html(infoText);
+            }
+        }
     });
     
     // Discount calculation
@@ -741,6 +873,45 @@ $(document).ready(function() {
                 confirmButtonText: 'OK'
             });
             return false;
+        }
+        
+        // Validate installments total for credit card payments
+        const paymentMethod = $('#payment_method').val();
+        if (paymentMethod === 'cartao_credito' && installmentsData.length > 0) {
+            const total = parseFloat($('#total').text().replace('R$ ', '').replace(',', '.')) || 0;
+            const installmentsTotal = installmentsData.reduce((sum, installment) => sum + installment.amount, 0);
+            const difference = Math.abs(total - installmentsTotal);
+            
+            if (difference > 0.01) {
+                e.preventDefault();
+                
+                Swal.fire({
+                    title: 'Inconsistência nas Parcelas!',
+                    html: `
+                        <div class="text-start">
+                            <p><strong>Método de Pagamento:</strong> Cartão de Crédito</p>
+                            <p><strong>Total da Venda:</strong> R$ ${total.toFixed(2).replace('.', ',')}</p>
+                            <p><strong>Total das Parcelas:</strong> R$ ${installmentsTotal.toFixed(2).replace('.', ',')}</p>
+                            <p><strong>Diferença:</strong> R$ ${difference.toFixed(2).replace('.', ',')}</p>
+                            <hr>
+                            <p class="text-danger"><i class="fas fa-exclamation-triangle"></i> Não é possível salvar com valores inconsistentes!</p>
+                            <p class="text-muted">Ajuste as parcelas antes de continuar.</p>
+                        </div>
+                    `,
+                    icon: 'error',
+                    showCancelButton: true,
+                    confirmButtonText: 'Forçar Salvamento',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#dc3545',
+                    cancelButtonColor: '#6c757d'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // Continue with form submission
+                        $('#sellForm')[0].submit();
+                    }
+                });
+                return false;
+            }
         }
         
         // Add hidden inputs for selected products
@@ -773,6 +944,17 @@ $(document).ready(function() {
     if ($('#payment_method').val() === 'cartao_credito') {
         $('#installmentsField').show();
     }
+    
+    // Event listener for modal close
+    $('#installmentsModal').on('hidden.bs.modal', function() {
+        // Limpar notificações quando o modal é fechado
+        hideDifferenceNotification();
+        $('#autoFixBtn').hide();
+        $('#inconsistencyWarning').remove();
+        
+        // Atualizar o resumo das parcelas no sidebar
+        updateInstallmentsSummary();
+    });
 });
 
 function loadProducts() {
@@ -993,7 +1175,46 @@ function calculateTotals() {
     // Update installments summary if credit card is selected
     if ($('#payment_method').val() === 'cartao_credito') {
         updateInstallmentsSummary();
+        
+        // Verificar se há diferença nas parcelas após mudança no total
+        if (installmentsData.length > 0) {
+            const installmentsTotal = installmentsData.reduce((sum, installment) => sum + installment.amount, 0);
+            const difference = Math.abs(total - installmentsTotal);
+            
+            if (difference > 0.01) {
+                // Atualizar o resumo das parcelas com alerta visual
+                const statusText = total > installmentsTotal ? 'Faltam' : 'Sobram';
+                const statusClass = total > installmentsTotal ? 'text-danger' : 'text-warning';
+                
+                const installmentsInfo = $('#installmentsInfo');
+                let infoText = installmentsData.length + 'x - Total: R$ ' + installmentsTotal.toFixed(2).replace('.', ',');
+                infoText += ' <span class="' + statusClass + '"><i class="fas fa-exclamation-triangle"></i> ' + statusText + ': R$ ' + difference.toFixed(2).replace('.', ',') + '</span>';
+                installmentsInfo.html(infoText);
+                
+                // Mostrar notificação temporária
+                showTemporaryDifferenceAlert(difference, statusText);
+            }
+        }
     }
+}
+
+function showTemporaryDifferenceAlert(difference, statusText) {
+    // Remover alerta anterior se existir
+    $('#tempDifferenceAlert').remove();
+    
+    const alertHtml = `
+        <div id="tempDifferenceAlert" class="alert alert-warning alert-dismissible fade show mt-2" role="alert">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <strong>Total alterado!</strong> ${statusText} R$ ${difference.toFixed(2).replace('.', ',')} nas parcelas.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+    $('#installmentsSummary').after(alertHtml);
+    
+    // Remover alerta após 5 segundos
+    setTimeout(() => {
+        $('#tempDifferenceAlert').fadeOut();
+    }, 5000);
 }
 
 function updateInstallmentsSummary() {
@@ -1002,21 +1223,46 @@ function updateInstallmentsSummary() {
     
     const installmentsSummary = $('#installmentsSummary');
     const installmentsInfo = $('#installmentsInfo');
+    const sidebarAlert = $('#sidebarDifferenceAlert');
+    const sidebarAlertText = $('#sidebarDifferenceText');
     
     if (total > 0 && installments > 0) {
         // If we have existing installments data, use the actual total from installments
         if (installmentsData.length > 0) {
             const actualTotal = installmentsData.reduce((sum, installment) => sum + installment.amount, 0);
-            installmentsInfo.text(installments + 'x - Total: R$ ' + actualTotal.toFixed(2).replace('.', ','));
+            const difference = total - actualTotal;
+            const absDifference = Math.abs(difference);
+            
+            let infoText = installments + 'x - Total: R$ ' + actualTotal.toFixed(2).replace('.', ',');
+            
+            if (absDifference > 0.01) {
+                const statusClass = difference > 0 ? 'text-danger' : 'text-warning';
+                const statusIcon = difference > 0 ? 'fas fa-exclamation-triangle' : 'fas fa-info-circle';
+                const statusText = difference > 0 ? 'Faltam' : 'Sobram';
+                
+                infoText += ' <span class="' + statusClass + '"><i class="' + statusIcon + '"></i> ' + statusText + ': R$ ' + absDifference.toFixed(2).replace('.', ',') + '</span>';
+                
+                // Mostrar alerta no sidebar
+                sidebarAlert.removeClass('alert-warning alert-danger').addClass(difference > 0 ? 'alert-danger' : 'alert-warning');
+                sidebarAlertText.text(`${statusText} R$ ${absDifference.toFixed(2).replace('.', ',')} nas parcelas`);
+                sidebarAlert.show();
+            } else {
+                infoText += ' <span class="text-success"><i class="fas fa-check-circle"></i> OK</span>';
+                sidebarAlert.hide();
+            }
+            
+            installmentsInfo.html(infoText);
         } else {
             // Only calculate automatic value if no existing data
             const installmentValue = total / installments;
             installmentsInfo.text(installments + 'x - R$ ' + installmentValue.toFixed(2).replace('.', ','));
+            sidebarAlert.hide();
         }
         installmentsSummary.show();
     } else {
         installmentsSummary.hide();
         $('#installmentsEditor').hide();
+        sidebarAlert.hide();
     }
 }
 
@@ -1053,9 +1299,28 @@ function toggleInstallmentsEditor() {
     updateModalSummary();
     updateInstallmentsTable();
     
+    // Verificar se há diferença antes de abrir o modal
+    const total = parseFloat($('#total').text().replace('R$ ', '').replace(',', '.')) || 0;
+    const installmentsTotal = installmentsData.reduce((sum, installment) => sum + installment.amount, 0);
+    const difference = Math.abs(total - installmentsTotal);
+    
     // Show modal
     const modal = new bootstrap.Modal(document.getElementById('installmentsModal'));
     modal.show();
+    
+    // Se há diferença, mostrar o botão de correção automática
+    if (difference > 0.01) {
+        $('#autoFixBtn').show();
+        
+        // Mostrar notificação sutil
+        setTimeout(() => {
+            const statusText = total > installmentsTotal ? 'Faltam' : 'Sobram';
+            showDifferenceNotification(total - installmentsTotal, difference);
+        }, 300);
+    } else {
+        $('#autoFixBtn').hide();
+        hideDifferenceNotification();
+    }
 }
 
 function updateInstallmentsTable() {
@@ -1115,6 +1380,7 @@ function updateInstallmentAmount(index, amount) {
     amount = parseFloat(amount);
     if (amount < 0) amount = 0;
     
+    const oldAmount = installmentsData[index].amount;
     installmentsData[index].amount = amount;
     installmentsData[index].manuallyEdited = true;
     
@@ -1123,8 +1389,221 @@ function updateInstallmentAmount(index, amount) {
         installmentsData[i].manuallyEdited = false;
     }
     
+    // Recalcular automaticamente a diferença
     recalculateInstallments();
     updateModalSummary();
+    updateInstallmentsTable(); // Atualiza a tabela para mostrar mudanças visuais
+    
+    // Atualiza a diferença em tempo real
+    updateDifferenceDisplay();
+    
+    // Mostrar alerta se houver diferença significativa
+    const total = parseFloat($('#total').text().replace('R$ ', '').replace(',', '.')) || 0;
+    const installmentsTotal = installmentsData.reduce((sum, installment) => sum + installment.amount, 0);
+    const difference = Math.abs(total - installmentsTotal);
+    
+    if (difference > 0.01) {
+        // Destacar visualmente a linha com diferença
+        const row = $(`#installmentsTableBody tr:eq(${index})`);
+        row.removeClass('table-success').addClass('table-warning');
+        
+        // Aplicar classe CSS ao input
+        const input = row.find('.installment-amount');
+        const statusClass = total > installmentsTotal ? 'border-danger' : 'border-warning';
+        input.removeClass('border-success border-warning border-danger').addClass(statusClass);
+        
+        // Mostrar notificação sutil
+        const statusText = total > installmentsTotal ? 'Faltam' : 'Sobram';
+        
+        // Atualizar o resumo no modal com destaque
+        $('#modalDifference').removeClass('text-success').addClass(total > installmentsTotal ? 'text-danger' : 'text-warning');
+        $('#modalDifference').html(`R$ ${difference.toFixed(2).replace('.', ',')} <i class="fas fa-exclamation-triangle"></i> ${statusText}`);
+    } else {
+        // Remover destaque se não há diferença
+        const row = $(`#installmentsTableBody tr:eq(${index})`);
+        row.removeClass('table-warning').addClass('table-success');
+        
+        // Remover classes CSS do input
+        const input = row.find('.installment-amount');
+        input.removeClass('border-warning border-danger border-success');
+        
+        $('#modalDifference').removeClass('text-danger text-warning').addClass('text-success');
+        $('#modalDifference').html(`R$ ${difference.toFixed(2).replace('.', ',')} <i class="fas fa-check-circle"></i>`);
+    }
+}
+
+function updateDifferenceDisplay() {
+    const total = parseFloat($('#total').text().replace('R$ ', '').replace(',', '.')) || 0;
+    const installmentsTotal = installmentsData.reduce((sum, installment) => sum + installment.amount, 0);
+    const difference = total - installmentsTotal;
+    const absDifference = Math.abs(difference);
+    
+    // Atualiza o resumo das parcelas com a diferença
+    const installmentsInfo = $('#installmentsInfo');
+    if (installmentsData.length > 0) {
+        let infoText = installmentsData.length + 'x - Total: R$ ' + installmentsTotal.toFixed(2).replace('.', ',');
+        
+        if (absDifference > 0.01) {
+            const statusClass = difference > 0 ? 'text-danger' : 'text-warning';
+            const statusIcon = difference > 0 ? 'fas fa-exclamation-triangle' : 'fas fa-info-circle';
+            const statusText = difference > 0 ? 'Faltam' : 'Sobram';
+            
+            infoText += ' <span class="' + statusClass + '"><i class="' + statusIcon + '"></i> ' + statusText + ': R$ ' + absDifference.toFixed(2).replace('.', ',') + '</span>';
+            
+            // Mostrar notificação visual sutil
+            showDifferenceNotification(difference, absDifference);
+            
+            // Mostrar botão de correção automática
+            $('#autoFixBtn').show();
+        } else {
+            infoText += ' <span class="text-success"><i class="fas fa-check-circle"></i> OK</span>';
+            hideDifferenceNotification();
+            
+            // Ocultar botão de correção automática
+            $('#autoFixBtn').hide();
+        }
+        
+        installmentsInfo.html(infoText);
+    }
+    
+    // Atualiza o resumo no modal
+    updateModalSummary();
+}
+
+function showDifferenceNotification(difference, absDifference) {
+    // Remover notificação anterior se existir
+    hideDifferenceNotification();
+    
+    const statusClass = difference > 0 ? 'alert-danger' : 'alert-warning';
+    const statusIcon = difference > 0 ? 'fas fa-exclamation-triangle' : 'fas fa-info-circle';
+    const statusText = difference > 0 ? 'Faltam' : 'Sobram';
+    
+    const notificationHtml = `
+        <div id="differenceNotification" class="alert ${statusClass} alert-dismissible fade show mt-3" role="alert">
+            <i class="${statusIcon} me-2"></i>
+            <strong>Diferença detectada!</strong> ${statusText} R$ ${absDifference.toFixed(2).replace('.', ',')} nas parcelas.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+    
+    // Adicionar notificação antes do modal footer
+    $('.modal-footer').before(notificationHtml);
+    
+    // Adicionar classe de destaque ao modal
+    $('#installmentsModal .modal-content').addClass('border-warning');
+}
+
+function hideDifferenceNotification() {
+    $('#differenceNotification').remove();
+    $('#installmentsModal .modal-content').removeClass('border-warning');
+}
+
+function autoFixDifference() {
+    const total = parseFloat($('#total').text().replace('R$ ', '').replace(',', '.')) || 0;
+    const installmentsTotal = installmentsData.reduce((sum, installment) => sum + installment.amount, 0);
+    const difference = total - installmentsTotal;
+    const absDifference = Math.abs(difference);
+    
+    if (absDifference <= 0.01) {
+        Swal.fire({
+            title: 'Nenhuma diferença!',
+            text: 'As parcelas já estão corretas.',
+            icon: 'info',
+            confirmButtonText: 'OK'
+        });
+        return;
+    }
+    
+    Swal.fire({
+        title: 'Corrigir Diferença Automaticamente?',
+        html: `
+            <div class="text-start">
+                <p><strong>Total da Venda:</strong> R$ ${total.toFixed(2).replace('.', ',')}</p>
+                <p><strong>Total das Parcelas:</strong> R$ ${installmentsTotal.toFixed(2).replace('.', ',')}</p>
+                <p><strong>Diferença:</strong> R$ ${absDifference.toFixed(2).replace('.', ',')}</p>
+                <hr>
+                <p class="text-info"><i class="fas fa-info-circle"></i> A diferença será distribuída proporcionalmente entre as parcelas não editadas manualmente.</p>
+            </div>
+        `,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, corrigir!',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#ffc107'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Encontrar a última parcela editada manualmente
+            let lastEditedIndex = -1;
+            for (let i = installmentsData.length - 1; i >= 0; i--) {
+                if (installmentsData[i].manuallyEdited) {
+                    lastEditedIndex = i;
+                    break;
+                }
+            }
+            
+            // Distribuir a diferença nas parcelas não editadas
+            if (lastEditedIndex === -1) {
+                // Se nenhuma parcela foi editada, distribuir proporcionalmente
+                const totalAmount = installmentsData.reduce((sum, installment) => sum + installment.amount, 0);
+                
+                if (totalAmount > 0) {
+                    installmentsData.forEach(installment => {
+                        const proportion = installment.amount / totalAmount;
+                        installment.amount += difference * proportion;
+                    });
+                } else {
+                    // Se todos os valores são zero, distribuir igualmente
+                    const equalAmount = total / installmentsData.length;
+                    installmentsData.forEach(installment => {
+                        installment.amount = equalAmount;
+                    });
+                }
+            } else {
+                // Distribuir apenas nas parcelas após a última editada
+                const remainingInstallments = installmentsData.slice(lastEditedIndex + 1);
+                
+                if (remainingInstallments.length > 0) {
+                    const remainingTotal = remainingInstallments.reduce((sum, installment) => sum + installment.amount, 0);
+                    
+                    if (remainingTotal > 0) {
+                        remainingInstallments.forEach((installment, index) => {
+                            const proportion = installment.amount / remainingTotal;
+                            const installmentIndex = lastEditedIndex + 1 + index;
+                            installmentsData[installmentIndex].amount += difference * proportion;
+                        });
+                    } else {
+                        // Se os valores restantes são zero, distribuir igualmente
+                        const equalAmount = difference / remainingInstallments.length;
+                        remainingInstallments.forEach((installment, index) => {
+                            const installmentIndex = lastEditedIndex + 1 + index;
+                            installmentsData[installmentIndex].amount = equalAmount;
+                        });
+                    }
+                }
+            }
+            
+            // Garantir que nenhum valor seja negativo
+            installmentsData.forEach(installment => {
+                if (installment.amount < 0) {
+                    installment.amount = 0;
+                }
+            });
+            
+            // Atualizar a interface
+            updateInstallmentsTable();
+            updateModalSummary();
+            updateDifferenceDisplay();
+            
+            // Mostrar sucesso
+            Swal.fire({
+                title: 'Diferença Corrigida!',
+                text: 'As parcelas foram ajustadas automaticamente.',
+                icon: 'success',
+                timer: 2000,
+                showConfirmButton: false
+            });
+        }
+    });
 }
 
 function updateInstallmentDate(index, date) {
@@ -1157,8 +1636,9 @@ function removeInstallment(index) {
 function recalculateInstallments() {
     const total = parseFloat($('#total').text().replace('R$ ', '').replace(',', '.')) || 0;
     const currentTotal = installmentsData.reduce((sum, installment) => sum + installment.amount, 0);
+    const difference = total - currentTotal;
     
-    if (Math.abs(total - currentTotal) > 0.01) {
+    if (Math.abs(difference) > 0.01) {
         // Find the last manually edited installment
         let lastEditedIndex = -1;
         for (let i = installmentsData.length - 1; i >= 0; i--) {
@@ -1168,36 +1648,61 @@ function recalculateInstallments() {
             }
         }
         
-        // If no manual edits, distribute proportionally
+        // If no manual edits, distribute proportionally among all installments
         if (lastEditedIndex === -1) {
-            const difference = total - currentTotal;
             const totalAmount = installmentsData.reduce((sum, installment) => sum + installment.amount, 0);
             
-            installmentsData.forEach(installment => {
-                const proportion = installment.amount / totalAmount;
-                installment.amount += difference * proportion;
-            });
+            if (totalAmount > 0) {
+                installmentsData.forEach(installment => {
+                    const proportion = installment.amount / totalAmount;
+                    installment.amount += difference * proportion;
+                });
+            } else {
+                // If all amounts are zero, distribute equally
+                const equalAmount = total / installmentsData.length;
+                installmentsData.forEach(installment => {
+                    installment.amount = equalAmount;
+                });
+            }
         } else {
             // Recalculate from the next installment after the last edited one
-            const difference = total - currentTotal;
             const remainingInstallments = installmentsData.slice(lastEditedIndex + 1);
             
             if (remainingInstallments.length > 0) {
                 const remainingTotal = remainingInstallments.reduce((sum, installment) => sum + installment.amount, 0);
                 
-                remainingInstallments.forEach((installment, index) => {
-                    const proportion = installment.amount / remainingTotal;
-                    const installmentIndex = lastEditedIndex + 1 + index;
-                    installmentsData[installmentIndex].amount += difference * proportion;
-                });
+                if (remainingTotal > 0) {
+                    remainingInstallments.forEach((installment, index) => {
+                        const proportion = installment.amount / remainingTotal;
+                        const installmentIndex = lastEditedIndex + 1 + index;
+                        installmentsData[installmentIndex].amount += difference * proportion;
+                    });
+                } else {
+                    // If remaining amounts are zero, distribute equally
+                    const equalAmount = difference / remainingInstallments.length;
+                    remainingInstallments.forEach((installment, index) => {
+                        const installmentIndex = lastEditedIndex + 1 + index;
+                        installmentsData[installmentIndex].amount = equalAmount;
+                    });
+                }
             }
         }
+        
+        // Garantir que nenhum valor seja negativo
+        installmentsData.forEach(installment => {
+            if (installment.amount < 0) {
+                installment.amount = 0;
+            }
+        });
         
         updateInstallmentsTable();
     }
     
     // Update installments summary
     updateInstallmentsSummaryDisplay();
+    
+    // Atualizar o resumo no modal
+    updateModalSummary();
 }
 
 function updateInstallmentsSummaryDisplay() {
@@ -1217,14 +1722,45 @@ function updateModalSummary() {
     $('#modalInstallmentsTotal').text('R$ ' + installmentsTotal.toFixed(2).replace('.', ','));
     $('#modalDifference').text('R$ ' + difference.toFixed(2).replace('.', ','));
     
-    // Color code the difference
-    if (Math.abs(difference) < 0.01) {
+    // Color code the difference with enhanced visual feedback
+    const absDifference = Math.abs(difference);
+    if (absDifference < 0.01) {
         $('#modalDifference').removeClass('text-danger text-warning').addClass('text-success');
+        $('#modalDifference').html('R$ ' + difference.toFixed(2).replace('.', ',') + ' <i class="fas fa-check-circle text-success"></i>');
+        $('#modalDifference').parent().removeClass('bg-light bg-warning bg-danger').addClass('bg-success bg-opacity-10');
     } else if (difference > 0) {
         $('#modalDifference').removeClass('text-success text-warning').addClass('text-danger');
+        $('#modalDifference').html('R$ ' + difference.toFixed(2).replace('.', ',') + ' <i class="fas fa-exclamation-triangle text-danger"></i> Faltam');
+        $('#modalDifference').parent().removeClass('bg-light bg-success bg-warning').addClass('bg-danger bg-opacity-10');
     } else {
         $('#modalDifference').removeClass('text-success text-danger').addClass('text-warning');
+        $('#modalDifference').html('R$ ' + absDifference.toFixed(2).replace('.', ',') + ' <i class="fas fa-exclamation-triangle text-warning"></i> Sobram');
+        $('#modalDifference').parent().removeClass('bg-light bg-success bg-danger').addClass('bg-warning bg-opacity-10');
     }
+    
+    // Show enhanced warning if there's a significant difference
+    if (absDifference > 0.01) {
+        if (!$('#inconsistencyWarning').length) {
+            const statusClass = difference > 0 ? 'alert-danger' : 'alert-warning';
+            const statusText = difference > 0 ? 'Faltam' : 'Sobram';
+            const statusIcon = difference > 0 ? 'fas fa-exclamation-triangle' : 'fas fa-info-circle';
+            
+            const warningHtml = `
+                <div id="inconsistencyWarning" class="alert ${statusClass} alert-dismissible fade show mt-3" role="alert">
+                    <i class="${statusIcon} me-2"></i>
+                    <strong>Atenção!</strong> O total das parcelas não confere com o total da venda.
+                    <br><strong>${statusText}:</strong> R$ ${absDifference.toFixed(2).replace('.', ',')}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+            $('.modal-body').append(warningHtml);
+        }
+    } else {
+        $('#inconsistencyWarning').remove();
+    }
+    
+    // Atualizar o resumo das parcelas no sidebar
+    updateInstallmentsSummary();
 }
 
 function saveInstallments() {
@@ -1234,12 +1770,22 @@ function saveInstallments() {
     
     if (difference > 0.01) {
         Swal.fire({
-            title: 'Atenção!',
-            text: 'O total das parcelas (R$ ' + installmentsTotal.toFixed(2).replace('.', ',') + ') não confere com o total da venda (R$ ' + total.toFixed(2).replace('.', ',') + '). Deseja continuar mesmo assim?',
+            title: 'Inconsistência Detectada!',
+            html: `
+                <div class="text-start">
+                    <p><strong>Total da Venda:</strong> R$ ${total.toFixed(2).replace('.', ',')}</p>
+                    <p><strong>Total das Parcelas:</strong> R$ ${installmentsTotal.toFixed(2).replace('.', ',')}</p>
+                    <p><strong>Diferença:</strong> R$ ${difference.toFixed(2).replace('.', ',')}</p>
+                    <hr>
+                    <p class="text-warning"><i class="fas fa-exclamation-triangle"></i> Os valores não conferem!</p>
+                </div>
+            `,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Sim, continuar',
-            cancelButtonText: 'Recalcular'
+            cancelButtonText: 'Recalcular',
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d'
         }).then((result) => {
             if (result.isConfirmed) {
                 closeModal();

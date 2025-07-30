@@ -234,6 +234,21 @@ class SellController extends Controller
             
             $discount = $request->discount ?? 0;
             $total_amount = $subtotal - $discount;
+            
+            // Validate installments total if credit card payment
+            if ($request->payment_method === 'cartao_credito' && $request->has('custom_installments')) {
+                $installmentsTotal = 0;
+                foreach ($request->custom_installments as $installment) {
+                    $installmentsTotal += $installment['amount'];
+                }
+                
+                $difference = abs($total_amount - $installmentsTotal);
+                if ($difference > 0.01) {
+                    return back()
+                        ->withInput()
+                        ->with('error', 'Inconsistência detectada: Total da venda (R$ ' . number_format($total_amount, 2, ',', '.') . ') não confere com total das parcelas (R$ ' . number_format($installmentsTotal, 2, ',', '.') . '). Diferença: R$ ' . number_format($difference, 2, ',', '.'));
+                }
+            }
 
             // Update sell
             $sell->update([
