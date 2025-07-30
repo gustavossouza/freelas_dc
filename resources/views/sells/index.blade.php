@@ -266,6 +266,11 @@
                                            title="Visualizar">
                                             <i class="fas fa-eye"></i>
                                         </a>
+                                        <a href="{{ route('sells.edit', $sell->id) }}" 
+                                           class="btn btn-sm btn-outline-warning" 
+                                           title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
                                         @if($sell->payment_status == 'pending')
                                         <button type="button" 
                                                 class="btn btn-sm btn-outline-success" 
@@ -937,6 +942,8 @@ function openInstallmentsModal(sellId, clientName) {
             hideLoading();
             $('#installmentsContent').html(response);
             $('#installmentsModalLabel').html(`<i class="fas fa-credit-card me-2"></i>Parcelas - ${clientName}`);
+            // Set the sell ID in the modal data
+            $('#installmentsModal').data('sell-id', sellId);
             $('#installmentsModal').modal('show');
         },
         error: function(xhr) {
@@ -987,7 +994,15 @@ function markInstallmentAsPaidActionModal(installmentId) {
             }).then(() => {
                 // Reload the modal content
                 const sellId = $('#installmentsModal').data('sell-id');
-                openInstallmentsModal(sellId, $('#installmentsModalLabel').text().replace('Parcelas - ', ''));
+                const modalLabel = $('#installmentsModalLabel').text();
+                const clientName = modalLabel.replace('Parcelas - ', '').replace(/^.*?Parcelas - /, '');
+                
+                if (sellId && sellId !== 'undefined') {
+                    openInstallmentsModal(sellId, clientName);
+                } else {
+                    // Close modal if sell ID is not available
+                    $('#installmentsModal').modal('hide');
+                }
             });
         },
         error: function(xhr) {

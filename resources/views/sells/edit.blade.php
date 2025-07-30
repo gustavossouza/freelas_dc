@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Nova Venda - Sistema de Vendas')
+@section('title', 'Editar Venda - Sistema de Vendas')
 
 @section('content')
 <div class="row">
@@ -8,13 +8,14 @@
         <div class="card fade-in">
             <div class="card-header">
                 <h4 class="mb-0">
-                    <i class="fas fa-plus me-2"></i>
-                    Nova Venda
+                    <i class="fas fa-edit me-2"></i>
+                    Editar Venda #{{ $sell->id }}
                 </h4>
             </div>
             <div class="card-body">
-                <form action="{{ route('sells.store') }}" method="POST" id="sellForm">
+                <form action="{{ route('sells.update', $sell->id) }}" method="POST" id="sellForm">
                     @csrf
+                    @method('PUT')
                     
                     <!-- Client Selection -->
                     <div class="row mb-4">
@@ -36,7 +37,7 @@
                                                 required>
                                             <option value="">Selecione um cliente</option>
                                             @foreach($clients ?? [] as $client)
-                                                <option value="{{ $client->id }}" {{ old('client_id') == $client->id ? 'selected' : '' }}>
+                                                <option value="{{ $client->id }}" {{ old('client_id', $sell->client_id) == $client->id ? 'selected' : '' }}>
                                                     {{ $client->name }} - {{ $client->email }}
                                                 </option>
                                             @endforeach
@@ -146,10 +147,10 @@
                                                     id="payment_method" 
                                                     name="payment_method">
                                                 <option value="">Selecione a forma de pagamento</option>
-                                                <option value="pix" {{ old('payment_method') == 'pix' ? 'selected' : '' }}>PIX</option>
-                                                <option value="cartao_debito" {{ old('payment_method') == 'cartao_debito' ? 'selected' : '' }}>Cartão de Débito</option>
-                                                <option value="cartao_credito" {{ old('payment_method') == 'cartao_credito' ? 'selected' : '' }}>Cartão de Crédito (até 12x)</option>
-                                                <option value="boleto" {{ old('payment_method') == 'boleto' ? 'selected' : '' }}>Boleto</option>
+                                                <option value="pix" {{ old('payment_method', $sell->payment_method) == 'pix' ? 'selected' : '' }}>PIX</option>
+                                                <option value="cartao_debito" {{ old('payment_method', $sell->payment_method) == 'cartao_debito' ? 'selected' : '' }}>Cartão de Débito</option>
+                                                <option value="cartao_credito" {{ old('payment_method', $sell->payment_method) == 'cartao_credito' ? 'selected' : '' }}>Cartão de Crédito (até 12x)</option>
+                                                <option value="boleto" {{ old('payment_method', $sell->payment_method) == 'boleto' ? 'selected' : '' }}>Boleto</option>
                                             </select>
                                             <button type="button" class="btn btn-outline-secondary" onclick="fillCommonPaymentMethods()" title="Preenchimento Rápido">
                                                 <i class="fas fa-magic"></i>
@@ -160,7 +161,7 @@
                                         @enderror
                                     </div>
                                 </div>
-                                <div class="col-md-6" id="installmentsField" style="display: none;">
+                                <div class="col-md-6" id="installmentsField" style="display: {{ $sell->installments->count() > 1 ? 'block' : 'none' }};">
                                     <div class="mb-3">
                                         <label for="installments" class="form-label">
                                             <i class="fas fa-credit-card me-1"></i>Número de Parcelas
@@ -169,18 +170,18 @@
                                             <select class="form-select @error('installments') is-invalid @enderror" 
                                                     id="installments" 
                                                     name="installments">
-                                                <option value="1">1x - À vista</option>
-                                                <option value="2">2x</option>
-                                                <option value="3">3x</option>
-                                                <option value="4">4x</option>
-                                                <option value="5">5x</option>
-                                                <option value="6">6x</option>
-                                                <option value="7">7x</option>
-                                                <option value="8">8x</option>
-                                                <option value="9">9x</option>
-                                                <option value="10">10x</option>
-                                                <option value="11">11x</option>
-                                                <option value="12">12x</option>
+                                                <option value="1" {{ old('installments', $sell->installments->count() ?: 1) == 1 ? 'selected' : '' }}>1x - À vista</option>
+                                                <option value="2" {{ old('installments', $sell->installments->count() ?: 1) == 2 ? 'selected' : '' }}>2x</option>
+                                                <option value="3" {{ old('installments', $sell->installments->count() ?: 1) == 3 ? 'selected' : '' }}>3x</option>
+                                                <option value="4" {{ old('installments', $sell->installments->count() ?: 1) == 4 ? 'selected' : '' }}>4x</option>
+                                                <option value="5" {{ old('installments', $sell->installments->count() ?: 1) == 5 ? 'selected' : '' }}>5x</option>
+                                                <option value="6" {{ old('installments', $sell->installments->count() ?: 1) == 6 ? 'selected' : '' }}>6x</option>
+                                                <option value="7" {{ old('installments', $sell->installments->count() ?: 1) == 7 ? 'selected' : '' }}>7x</option>
+                                                <option value="8" {{ old('installments', $sell->installments->count() ?: 1) == 8 ? 'selected' : '' }}>8x</option>
+                                                <option value="9" {{ old('installments', $sell->installments->count() ?: 1) == 9 ? 'selected' : '' }}>9x</option>
+                                                <option value="10" {{ old('installments', $sell->installments->count() ?: 1) == 10 ? 'selected' : '' }}>10x</option>
+                                                <option value="11" {{ old('installments', $sell->installments->count() ?: 1) == 11 ? 'selected' : '' }}>11x</option>
+                                                <option value="12" {{ old('installments', $sell->installments->count() ?: 1) == 12 ? 'selected' : '' }}>12x</option>
                                             </select>
                                             <button type="button" class="btn btn-outline-secondary" onclick="quickFillInstallments()" title="Configuração Rápida">
                                                 <i class="fas fa-bolt"></i>
@@ -200,7 +201,7 @@
                                                class="form-control @error('sale_date') is-invalid @enderror" 
                                                id="sale_date" 
                                                name="sale_date" 
-                                               value="{{ old('sale_date', date('Y-m-d')) }}" 
+                                               value="{{ old('sale_date', $sell->sale_date) }}" 
                                                required>
                                         @error('sale_date')
                                             <div class="invalid-feedback">{{ $message }}</div>
@@ -219,13 +220,29 @@
                                                class="form-control @error('due_date') is-invalid @enderror" 
                                                id="due_date" 
                                                name="due_date" 
-                                               value="{{ old('due_date') }}">
+                                               value="{{ old('due_date', $sell->due_date) }}">
                                         @error('due_date')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
                                     </div>
                                 </div>
-
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="status" class="form-label">
+                                            <i class="fas fa-info-circle me-1"></i>Status da Venda
+                                        </label>
+                                        <select class="form-select @error('status') is-invalid @enderror" 
+                                                id="status" 
+                                                name="status">
+                                            <option value="pending" {{ old('status', $sell->status) == 'pending' ? 'selected' : '' }}>Pendente</option>
+                                            <option value="completed" {{ old('status', $sell->status) == 'completed' ? 'selected' : '' }}>Concluída</option>
+                                            <option value="cancelled" {{ old('status', $sell->status) == 'cancelled' ? 'selected' : '' }}>Cancelada</option>
+                                        </select>
+                                        @error('status')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                </div>
                             </div>
                             
                             <div class="mb-3">
@@ -236,7 +253,7 @@
                                           id="notes" 
                                           name="notes" 
                                           rows="3" 
-                                          placeholder="Observações sobre a venda">{{ old('notes') }}</textarea>
+                                          placeholder="Observações sobre a venda">{{ old('notes', $sell->notes) }}</textarea>
                                 @error('notes')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
@@ -250,9 +267,9 @@
                             <i class="fas fa-arrow-left me-2"></i>
                             Voltar
                         </a>
-                        <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
+                        <button type="submit" class="btn btn-primary" id="submitBtn">
                             <i class="fas fa-save me-2"></i>
-                            Finalizar Venda
+                            Atualizar Venda
                         </button>
                     </div>
                 </form>
@@ -278,7 +295,7 @@
                     <span>Desconto:</span>
                     <div class="input-group input-group-sm">
                         <span class="input-group-text">R$</span>
-                        <input type="number" id="discount" name="discount" class="form-control" value="0" step="0.01" min="0">
+                        <input type="number" id="discount" name="discount" class="form-control" value="{{ old('discount', $sell->discount) }}" step="0.01" min="0">
                     </div>
                 </div>
 
@@ -556,6 +573,12 @@ let selectedProducts = [];
 let allProducts = [];
 let installmentsData = [];
 
+// Load existing sell items
+const existingItems = @json($sell->sellItems);
+
+// Load existing installments
+const existingInstallments = @json($sell->installments);
+
 $(document).ready(function() {
     // Initialize product select with Select2
     $('#product_id').select2({
@@ -595,6 +618,23 @@ $(document).ready(function() {
     
     // Load products for reference
     loadProducts();
+    
+    // Load existing sell items
+    loadExistingItems();
+    
+    // Load existing installments
+    loadExistingInstallments();
+    
+    // Auto-fill common fields
+    autoFillCommonFields();
+    
+    // Show installments field if there are existing installments
+    if (existingInstallments && existingInstallments.length > 1) {
+        $('#installmentsField').show();
+    }
+    
+    // Ensure installments field is properly set
+    ensureInstallmentsFieldCorrect();
     
     // Payment method change
     $('#payment_method').on('change', function() {
@@ -640,7 +680,12 @@ $(document).ready(function() {
     $('#sellForm').on('submit', function(e) {
         if (selectedProducts.length === 0) {
             e.preventDefault();
-            alert('Adicione pelo menos um produto à venda.');
+            Swal.fire({
+                title: 'Atenção!',
+                text: 'Adicione pelo menos um produto à venda.',
+                icon: 'warning',
+                confirmButtonText: 'OK'
+            });
             return false;
         }
         
@@ -670,8 +715,10 @@ $(document).ready(function() {
         showLoading();
     });
     
-    // Auto-fill common fields
-    autoFillCommonFields();
+    // Initialize payment method display
+    if ($('#payment_method').val() === 'cartao_credito') {
+        $('#installmentsField').show();
+    }
 });
 
 function loadProducts() {
@@ -685,6 +732,27 @@ function loadProducts() {
             // Silent error - not critical for Select2 functionality
         }
     });
+}
+
+function loadExistingItems() {
+    if (existingItems && existingItems.length > 0) {
+        existingItems.forEach(item => {
+            const product = {
+                id: item.product_id || null,
+                name: item.product_name,
+                description: item.description || '',
+                unit_price: parseFloat(item.unit_price),
+                quantity: parseInt(item.quantity),
+                total_price: parseFloat(item.total_price),
+                unit: 'unidade'
+            };
+            
+            selectedProducts.push(product);
+        });
+        
+        updateSelectedProductsTable();
+        calculateTotals();
+    }
 }
 
 function formatProductOption(product) {
@@ -773,33 +841,6 @@ function addSelectedProduct() {
         timer: 1500,
         showConfirmButton: false
     });
-}
-
-function addProduct(productId) {
-    const product = allProducts.find(p => p.id === productId);
-    if (!product) return;
-    
-    // Check if product is already added
-    const existingIndex = selectedProducts.findIndex(p => p.id === productId);
-    if (existingIndex !== -1) {
-        // Increase quantity
-        selectedProducts[existingIndex].quantity += 1;
-        selectedProducts[existingIndex].total_price = selectedProducts[existingIndex].quantity * selectedProducts[existingIndex].unit_price;
-    } else {
-        // Add new product
-        selectedProducts.push({
-            id: product.id,
-            name: product.name,
-            description: product.description || '',
-            quantity: 1,
-            unit_price: parseFloat(product.price),
-            total_price: parseFloat(product.price),
-            unit: product.unit
-        });
-    }
-    
-    updateSelectedProductsTable();
-    updateTotals();
 }
 
 function updateSelectedProductsTable() {
@@ -924,8 +965,31 @@ function updateInstallmentsSummary() {
     }
 }
 
-// Installments management
+function loadExistingInstallments() {
+    if (existingInstallments && existingInstallments.length > 0) {
+        // Set the installments field to the correct number
+        $('#installments').val(existingInstallments.length);
+        
+        // Show installments field if more than 1 installment
+        if (existingInstallments.length > 1) {
+            $('#installmentsField').show();
+        }
+        
+        existingInstallments.forEach(installment => {
+            installmentsData.push({
+                number: installment.installment_number,
+                amount: parseFloat(installment.amount),
+                dueDate: installment.due_date,
+                id: installment.id
+            });
+        });
+        
+        updateInstallmentsSummary();
+        updateInstallmentsSummaryDisplay();
+    }
+}
 
+// Installments management
 function generateInstallments(total, installments) {
     // Clear existing installments and regenerate
     installmentsData = [];
@@ -1128,12 +1192,12 @@ function closeModal() {
 
 // Auto-fill functions
 function autoFillCommonFields() {
-    // Auto-fill sale date with today's date
+    // Auto-fill sale date with today's date if empty
     if (!$('#sale_date').val()) {
         $('#sale_date').val(new Date().toISOString().split('T')[0]);
     }
     
-    // Auto-fill due date with next month
+    // Auto-fill due date with next month if empty
     if (!$('#due_date').val()) {
         const nextMonth = new Date();
         nextMonth.setMonth(nextMonth.getMonth() + 1);
@@ -1353,6 +1417,24 @@ function fillDebitCardPayment() {
     });
 }
 
+function ensureInstallmentsFieldCorrect() {
+    // If there are existing installments, make sure the field shows the correct number
+    if (existingInstallments && existingInstallments.length > 0) {
+        const installmentCount = existingInstallments.length;
+        
+        // Set the installments field to the correct number
+        $('#installments').val(installmentCount);
+        
+        // If it's more than 1 installment, show the field
+        if (installmentCount > 1) {
+            $('#installmentsField').show();
+        }
+        
+        // Update the summary
+        updateInstallmentsSummary();
+    }
+}
+
 function addInstallment() {
     const total = parseFloat($('#total').text().replace('R$ ', '').replace(',', '.')) || 0;
     const newAmount = total / (installmentsData.length + 1);
@@ -1389,8 +1471,7 @@ function clearSale() {
             selectedProducts = [];
             updateSelectedProductsTable();
             calculateTotals();
-            $('#sellForm')[0].reset();
-            $('#product_id').val(null).trigger('change');
+            $('#discount').val(0);
             
             Swal.fire({
                 title: 'Venda Limpa!',
@@ -1405,7 +1486,23 @@ function clearSale() {
 
 function saveDraft() {
     // TODO: Implement draft saving
-    alert('Funcionalidade de rascunho será implementada em breve!');
+    Swal.fire({
+        title: 'Funcionalidade em Desenvolvimento',
+        text: 'Funcionalidade de rascunho será implementada em breve!',
+        icon: 'info',
+        confirmButtonText: 'OK'
+    });
+}
+
+function showLoading() {
+    Swal.fire({
+        title: 'Salvando...',
+        text: 'Aguarde enquanto atualizamos a venda.',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
 }
 </script>
 @endsection 

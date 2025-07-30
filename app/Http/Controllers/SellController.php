@@ -110,26 +110,41 @@ class SellController extends Controller
 
             // Generate installments for credit card payments
             if ($request->payment_method === 'cartao_credito' && $request->installments > 1) {
-                $installmentAmount = $total_amount / $request->installments;
-                
-                // Parse due_date to Carbon instance
-                if ($request->due_date) {
-                    $firstDueDate = \Carbon\Carbon::createFromFormat('Y-m-d', $request->due_date);
+                // Check if custom installments are provided
+                if ($request->has('custom_installments') && is_array($request->custom_installments)) {
+                    foreach ($request->custom_installments as $installment) {
+                        \App\Models\Installment::create([
+                            'sell_id' => $sell->id,
+                            'installment_number' => $installment['number'],
+                            'amount' => $installment['amount'],
+                            'due_date' => $installment['due_date'],
+                            'status' => 'pending',
+                            'notes' => "Parcela {$installment['number']}",
+                        ]);
+                    }
                 } else {
-                    $firstDueDate = now()->addMonth();
-                }
-                
-                for ($i = 1; $i <= $request->installments; $i++) {
-                    $dueDate = $firstDueDate->copy()->addMonths($i - 1);
+                    // Use default installment calculation
+                    $installmentAmount = $total_amount / $request->installments;
                     
-                    \App\Models\Installment::create([
-                        'sell_id' => $sell->id,
-                        'installment_number' => $i,
-                        'amount' => $installmentAmount,
-                        'due_date' => $dueDate,
-                        'status' => 'pending',
-                        'notes' => "Parcela {$i} de {$request->installments}",
-                    ]);
+                    // Parse due_date to Carbon instance
+                    if ($request->due_date) {
+                        $firstDueDate = \Carbon\Carbon::createFromFormat('Y-m-d', $request->due_date);
+                    } else {
+                        $firstDueDate = now()->addMonth();
+                    }
+                    
+                    for ($i = 1; $i <= $request->installments; $i++) {
+                        $dueDate = $firstDueDate->copy()->addMonths($i - 1);
+                        
+                        \App\Models\Installment::create([
+                            'sell_id' => $sell->id,
+                            'installment_number' => $i,
+                            'amount' => $installmentAmount,
+                            'due_date' => $dueDate,
+                            'status' => 'pending',
+                            'notes' => "Parcela {$i} de {$request->installments}",
+                        ]);
+                    }
                 }
             }
 
@@ -166,7 +181,7 @@ class SellController extends Controller
     {
         try {
             $clients = Client::orderBy('name')->get();
-            $sell->load('sellItems');
+            $sell->load(['sellItems', 'installments']);
             
             return view('sells.edit', compact('sell', 'clients'));
         } catch (\Exception $e) {
@@ -182,20 +197,30 @@ class SellController extends Controller
         try {
             DB::beginTransaction();
 
+            // Calculate total from items
+            $subtotal = 0;
+            if ($request->has('items') && is_array($request->items)) {
+                foreach ($request->items as $item) {
+                    $subtotal += $item['total_price'];
+                }
+            }
+            
+            $discount = $request->discount ?? 0;
+            $total_amount = $subtotal - $discount;
+
             // Update sell
             $sell->update([
                 'client_id' => $request->client_id,
                 'payment_method' => $request->payment_method,
-                'total_amount' => $request->total_amount ?? 0,
-                'discount' => $request->discount ?? 0,
-                'tax' => $request->tax ?? 0,
+                'total_amount' => $total_amount,
+                'discount' => $discount,
                 'status' => $request->status,
                 'sale_date' => $request->sale_date,
                 'due_date' => $request->due_date,
                 'notes' => $request->notes,
             ]);
 
-            // Update sell items (simplified - in production you might want to handle this more carefully)
+            // Update sell items
             if ($request->has('items') && is_array($request->items)) {
                 // Delete existing items
                 $sell->sellItems()->delete();
@@ -211,7 +236,61 @@ class SellController extends Controller
                         'unit_price' => $item['unit_price'],
                         'total_price' => $item['total_price'],
                     ]);
+
+                    // Update product stock if product_id exists
+                    if (!empty($item['product_id'])) {
+                        $product = \App\Models\Product::find($item['product_id']);
+                        if ($product) {
+                            $product->decrement('stock_quantity', $item['quantity']);
+                        }
+                    }
                 }
+            }
+
+            // Handle installments for credit card payments
+            if ($request->payment_method === 'cartao_credito' && $request->installments > 1) {
+                // Delete existing installments
+                $sell->installments()->delete();
+                
+                // Check if custom installments are provided
+                if ($request->has('custom_installments') && is_array($request->custom_installments)) {
+                    foreach ($request->custom_installments as $installment) {
+                        \App\Models\Installment::create([
+                            'sell_id' => $sell->id,
+                            'installment_number' => $installment['number'],
+                            'amount' => $installment['amount'],
+                            'due_date' => $installment['due_date'],
+                            'status' => 'pending',
+                            'notes' => "Parcela {$installment['number']}",
+                        ]);
+                    }
+                } else {
+                    // Use default installment calculation
+                    $installmentAmount = $total_amount / $request->installments;
+                    
+                    // Parse due_date to Carbon instance
+                    if ($request->due_date) {
+                        $firstDueDate = \Carbon\Carbon::createFromFormat('Y-m-d', $request->due_date);
+                    } else {
+                        $firstDueDate = now()->addMonth();
+                    }
+                    
+                    for ($i = 1; $i <= $request->installments; $i++) {
+                        $dueDate = $firstDueDate->copy()->addMonths($i - 1);
+                        
+                        \App\Models\Installment::create([
+                            'sell_id' => $sell->id,
+                            'installment_number' => $i,
+                            'amount' => $installmentAmount,
+                            'due_date' => $dueDate,
+                            'status' => 'pending',
+                            'notes' => "Parcela {$i} de {$request->installments}",
+                        ]);
+                    }
+                }
+            } else {
+                // Remove installments if payment method changed
+                $sell->installments()->delete();
             }
 
             DB::commit();

@@ -40,6 +40,8 @@ Route::middleware(['auth'])->group(function () {
     
     // Rotas de Parcelas
     Route::post('/installments/{installment}/mark-as-paid', [InstallmentController::class, 'markAsPaid'])->name('installments.markAsPaid');
+    Route::post('/sells/{sell}/mark-all-pending-as-paid', [InstallmentController::class, 'markAllPendingAsPaid'])->name('installments.markAllPendingAsPaid');
+    Route::post('/sells/{sell}/mark-overdue-as-paid', [InstallmentController::class, 'markOverdueAsPaid'])->name('installments.markOverdueAsPaid');
     
     // Rotas de Produtos
     Route::get('/products/search', [ProductController::class, 'getProducts'])->name('products.getProducts');

@@ -217,7 +217,9 @@ function markAllPendingAsPaidAction(sellId) {
                 confirmButtonText: 'OK'
             }).then(() => {
                 // Reload the modal content
-                openInstallmentsModal(sellId, $('#installmentsModalLabel').text().replace('Parcelas - ', ''));
+                const modalLabel = $('#installmentsModalLabel').text();
+                const clientName = modalLabel.replace('Parcelas - ', '').replace(/^.*?Parcelas - /, '');
+                openInstallmentsModal(sellId, clientName);
             });
         },
         error: function(xhr) {
@@ -273,7 +275,9 @@ function markOverdueAsPaidAction(sellId) {
                 confirmButtonText: 'OK'
             }).then(() => {
                 // Reload the modal content
-                openInstallmentsModal(sellId, $('#installmentsModalLabel').text().replace('Parcelas - ', ''));
+                const modalLabel = $('#installmentsModalLabel').text();
+                const clientName = modalLabel.replace('Parcelas - ', '').replace(/^.*?Parcelas - /, '');
+                openInstallmentsModal(sellId, clientName);
             });
         },
         error: function(xhr) {
