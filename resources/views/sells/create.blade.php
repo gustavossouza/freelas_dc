@@ -359,8 +359,28 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-6">
-                        <div class="d-grid gap-2">
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <div class="alert alert-info">
+                            <h6 class="alert-heading">
+                                <i class="fas fa-lightbulb me-2"></i>
+                                Dica de Uso
+                            </h6>
+                            <p class="mb-2 small">
+                                <strong>Edição Manual:</strong> Clique em qualquer valor para editá-lo. As parcelas seguintes serão recalculadas automaticamente.
+                            </p>
+                            <p class="mb-0 small">
+                                <strong>Recalcular:</strong> Distribui a diferença proporcionalmente entre as parcelas não editadas.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <div class="d-flex gap-2">
                             <button type="button" class="btn btn-outline-success" onclick="addInstallment()">
                                 <i class="fas fa-plus me-2"></i>
                                 Adicionar Parcela
@@ -368,6 +388,10 @@
                             <button type="button" class="btn btn-outline-primary" onclick="recalculateInstallments()">
                                 <i class="fas fa-calculator me-2"></i>
                                 Recalcular
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="resetManualEdits()">
+                                <i class="fas fa-undo me-2"></i>
+                                Resetar Edições
                             </button>
                         </div>
                     </div>
@@ -417,6 +441,15 @@
 <!-- SweetAlert2 CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 <style>
+    .installment-amount.border-warning {
+        border-color: #ffc107 !important;
+        box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
+    }
+    
+    .table-warning {
+        background-color: rgba(255, 193, 7, 0.1) !important;
+    }
+    
     .summary-item {
         display: flex;
         justify-content: space-between;
@@ -939,7 +972,8 @@ function generateInstallments(total, installments) {
         installmentsData.push({
             number: i,
             amount: baseAmount,
-            dueDate: dueDate.toISOString().split('T')[0]
+            dueDate: dueDate.toISOString().split('T')[0],
+            manuallyEdited: false
         });
     }
     
@@ -971,18 +1005,24 @@ function updateInstallmentsTable() {
     
     let html = '';
     installmentsData.forEach((installment, index) => {
+        const isManuallyEdited = installment.manuallyEdited;
+        const rowClass = isManuallyEdited ? 'table-warning' : '';
+        const inputClass = isManuallyEdited ? 'form-control-sm installment-amount border-warning' : 'form-control-sm installment-amount';
+        
         html += `
-            <tr>
+            <tr class="${rowClass}">
                 <td class="text-center">
                     <strong>${installment.number}</strong>
+                    ${isManuallyEdited ? '<br><small class="text-warning"><i class="fas fa-edit"></i> Editada</small>' : ''}
                 </td>
                 <td>
                     <input type="number" 
-                           class="form-control form-control-sm installment-amount" 
+                           class="${inputClass}" 
                            value="${installment.amount.toFixed(2)}" 
                            step="0.01" 
                            min="0"
-                           onchange="updateInstallmentAmount(${index}, this.value)">
+                           onchange="updateInstallmentAmount(${index}, this.value)"
+                           title="${isManuallyEdited ? 'Parcela editada manualmente' : 'Clique para editar'}">
                 </td>
                 <td>
                     <input type="date" 
@@ -1010,6 +1050,13 @@ function updateInstallmentAmount(index, amount) {
     if (amount < 0) amount = 0;
     
     installmentsData[index].amount = amount;
+    installmentsData[index].manuallyEdited = true;
+    
+    // Mark all subsequent installments as not manually edited
+    for (let i = index + 1; i < installmentsData.length; i++) {
+        installmentsData[i].manuallyEdited = false;
+    }
+    
     recalculateInstallments();
     updateModalSummary();
 }
@@ -1046,14 +1093,39 @@ function recalculateInstallments() {
     const currentTotal = installmentsData.reduce((sum, installment) => sum + installment.amount, 0);
     
     if (Math.abs(total - currentTotal) > 0.01) {
-        // Distribute the difference proportionally
-        const difference = total - currentTotal;
-        const totalAmount = installmentsData.reduce((sum, installment) => sum + installment.amount, 0);
+        // Find the last manually edited installment
+        let lastEditedIndex = -1;
+        for (let i = installmentsData.length - 1; i >= 0; i--) {
+            if (installmentsData[i].manuallyEdited) {
+                lastEditedIndex = i;
+                break;
+            }
+        }
         
-        installmentsData.forEach(installment => {
-            const proportion = installment.amount / totalAmount;
-            installment.amount += difference * proportion;
-        });
+        // If no manual edits, distribute proportionally
+        if (lastEditedIndex === -1) {
+            const difference = total - currentTotal;
+            const totalAmount = installmentsData.reduce((sum, installment) => sum + installment.amount, 0);
+            
+            installmentsData.forEach(installment => {
+                const proportion = installment.amount / totalAmount;
+                installment.amount += difference * proportion;
+            });
+        } else {
+            // Recalculate from the next installment after the last edited one
+            const difference = total - currentTotal;
+            const remainingInstallments = installmentsData.slice(lastEditedIndex + 1);
+            
+            if (remainingInstallments.length > 0) {
+                const remainingTotal = remainingInstallments.reduce((sum, installment) => sum + installment.amount, 0);
+                
+                remainingInstallments.forEach((installment, index) => {
+                    const proportion = installment.amount / remainingTotal;
+                    const installmentIndex = lastEditedIndex + 1 + index;
+                    installmentsData[installmentIndex].amount += difference * proportion;
+                });
+            }
+        }
         
         updateInstallmentsTable();
     }
@@ -1123,6 +1195,38 @@ function closeModal() {
         icon: 'success',
         timer: 1500,
         showConfirmButton: false
+    });
+}
+
+function resetManualEdits() {
+    Swal.fire({
+        title: 'Resetar Edições Manuais',
+        text: 'Tem certeza que deseja resetar todas as edições manuais das parcelas?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, resetar',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const total = parseFloat($('#total').text().replace('R$ ', '').replace(',', '.')) || 0;
+            const baseAmount = total / installmentsData.length;
+            
+            installmentsData.forEach(installment => {
+                installment.amount = baseAmount;
+                installment.manuallyEdited = false;
+            });
+            
+            updateInstallmentsTable();
+            updateModalSummary();
+            
+            Swal.fire({
+                title: 'Resetado!',
+                text: 'Todas as edições manuais foram resetadas.',
+                icon: 'success',
+                timer: 1500,
+                showConfirmButton: false
+            });
+        }
     });
 }
 

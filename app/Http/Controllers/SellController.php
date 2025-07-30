@@ -183,7 +183,34 @@ class SellController extends Controller
             $clients = Client::orderBy('name')->get();
             $sell->load(['sellItems', 'installments']);
             
-            return view('sells.edit', compact('sell', 'clients'));
+            // Format installments data for JavaScript
+            $formattedInstallments = $sell->installments->map(function($installment) {
+                return [
+                    'id' => $installment->id,
+                    'installment_number' => $installment->installment_number,
+                    'amount' => (float) $installment->amount,
+                    'due_date' => $installment->due_date ? $installment->due_date->format('Y-m-d') : null,
+                    'status' => $installment->status,
+                    'notes' => $installment->notes
+                ];
+            });
+            
+
+            
+            // Format sell items data for JavaScript
+            $formattedSellItems = $sell->sellItems->map(function($item) {
+                return [
+                    'id' => $item->id,
+                    'product_id' => $item->product_id,
+                    'product_name' => $item->product_name,
+                    'description' => $item->description,
+                    'quantity' => (int) $item->quantity,
+                    'unit_price' => (float) $item->unit_price,
+                    'total_price' => (float) $item->total_price
+                ];
+            });
+            
+            return view('sells.edit', compact('sell', 'clients', 'formattedInstallments', 'formattedSellItems'));
         } catch (\Exception $e) {
             return back()->with('error', 'Erro ao carregar formulário: ' . $e->getMessage());
         }

@@ -258,7 +258,7 @@
             <p class="login-subtitle">Faça login para acessar o sistema</p>
         </div>
         
-        <form method="POST" action="{{ route('login') }}" id="loginForm">
+        <form method="POST" action="{{ route('login.post') }}" id="loginForm">
             @csrf
             
             <div class="form-group">

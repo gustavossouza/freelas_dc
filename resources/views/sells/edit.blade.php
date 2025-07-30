@@ -376,8 +376,28 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-6">
-                        <div class="d-grid gap-2">
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <div class="alert alert-info">
+                            <h6 class="alert-heading">
+                                <i class="fas fa-lightbulb me-2"></i>
+                                Dica de Uso
+                            </h6>
+                            <p class="mb-2 small">
+                                <strong>Edição Manual:</strong> Clique em qualquer valor para editá-lo. As parcelas seguintes serão recalculadas automaticamente.
+                            </p>
+                            <p class="mb-0 small">
+                                <strong>Recalcular:</strong> Distribui a diferença proporcionalmente entre as parcelas não editadas.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <div class="d-flex gap-2">
                             <button type="button" class="btn btn-outline-success" onclick="addInstallment()">
                                 <i class="fas fa-plus me-2"></i>
                                 Adicionar Parcela
@@ -385,6 +405,10 @@
                             <button type="button" class="btn btn-outline-primary" onclick="recalculateInstallments()">
                                 <i class="fas fa-calculator me-2"></i>
                                 Recalcular
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="resetManualEdits()">
+                                <i class="fas fa-undo me-2"></i>
+                                Resetar Edições
                             </button>
                         </div>
                     </div>
@@ -434,6 +458,15 @@
 <!-- SweetAlert2 CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 <style>
+    .installment-amount.border-warning {
+        border-color: #ffc107 !important;
+        box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
+    }
+    
+    .table-warning {
+        background-color: rgba(255, 193, 7, 0.1) !important;
+    }
+    
     .summary-item {
         display: flex;
         justify-content: space-between;
@@ -574,10 +607,10 @@ let allProducts = [];
 let installmentsData = [];
 
 // Load existing sell items
-const existingItems = @json($sell->sellItems);
+const existingItems = @json($formattedSellItems);
 
 // Load existing installments
-const existingInstallments = @json($sell->installments);
+const existingInstallments = @json($formattedInstallments);
 
 $(document).ready(function() {
     // Initialize product select with Select2
@@ -622,8 +655,31 @@ $(document).ready(function() {
     // Load existing sell items
     loadExistingItems();
     
-    // Load existing installments
-    loadExistingInstallments();
+    // Load existing installments from controller data (only once)
+    if (existingInstallments && existingInstallments.length > 0 && installmentsData.length === 0) {
+        // Set the installments field to the correct number
+        $('#installments').val(existingInstallments.length);
+        
+        // Show installments field if more than 1 installment
+        if (existingInstallments.length > 1) {
+            $('#installmentsField').show();
+        }
+        
+        existingInstallments.forEach(installment => {
+            const installmentData = {
+                number: installment.installment_number,
+                amount: installment.amount,
+                dueDate: installment.due_date,
+                id: installment.id,
+                manuallyEdited: false
+            };
+            
+            installmentsData.push(installmentData);
+        });
+        
+        updateInstallmentsSummary();
+        updateInstallmentsSummaryDisplay();
+    }
     
     // Auto-fill common fields
     autoFillCommonFields();
@@ -632,9 +688,6 @@ $(document).ready(function() {
     if (existingInstallments && existingInstallments.length > 1) {
         $('#installmentsField').show();
     }
-    
-    // Ensure installments field is properly set
-    ensureInstallmentsFieldCorrect();
     
     // Payment method change
     $('#payment_method').on('change', function() {
@@ -660,9 +713,10 @@ $(document).ready(function() {
         const installments = parseInt($(this).val());
         const total = parseFloat($('#total').text().replace('R$ ', '').replace(',', '.')) || 0;
         
-        if (installments > 1 && total > 0) {
+        // Only generate new installments if there are no existing ones from controller
+        if (installments > 1 && total > 0 && installmentsData.length === 0) {
             generateInstallments(total, installments);
-        } else {
+        } else if (installments <= 1) {
             installmentsData = [];
             updateInstallmentsTable();
             updateModalSummary();
@@ -691,24 +745,24 @@ $(document).ready(function() {
         
         // Add hidden inputs for selected products
         selectedProducts.forEach((product, index) => {
-            $(this).append(`
-                <input type="hidden" name="items[${index}][product_id]" value="${product.id}">
-                <input type="hidden" name="items[${index}][product_name]" value="${product.name}">
-                <input type="hidden" name="items[${index}][description]" value="${product.description || ''}">
-                <input type="hidden" name="items[${index}][quantity]" value="${product.quantity}">
-                <input type="hidden" name="items[${index}][unit_price]" value="${product.unit_price}">
-                <input type="hidden" name="items[${index}][total_price]" value="${product.total_price}">
-            `);
+            $(this).append(
+                '<input type="hidden" name="items[' + index + '][product_id]" value="' + product.id + '">' +
+                '<input type="hidden" name="items[' + index + '][product_name]" value="' + product.name + '">' +
+                '<input type="hidden" name="items[' + index + '][description]" value="' + (product.description || '') + '">' +
+                '<input type="hidden" name="items[' + index + '][quantity]" value="' + product.quantity + '">' +
+                '<input type="hidden" name="items[' + index + '][unit_price]" value="' + product.unit_price + '">' +
+                '<input type="hidden" name="items[' + index + '][total_price]" value="' + product.total_price + '">'
+            );
         });
         
         // Add hidden inputs for custom installments
         if (installmentsData.length > 0) {
             installmentsData.forEach((installment, index) => {
-                $(this).append(`
-                    <input type="hidden" name="custom_installments[${index}][number]" value="${installment.number}">
-                    <input type="hidden" name="custom_installments[${index}][amount]" value="${installment.amount}">
-                    <input type="hidden" name="custom_installments[${index}][due_date]" value="${installment.dueDate}">
-                `);
+                $(this).append(
+                    '<input type="hidden" name="custom_installments[' + index + '][number]" value="' + installment.number + '">' +
+                    '<input type="hidden" name="custom_installments[' + index + '][amount]" value="' + installment.amount + '">' +
+                    '<input type="hidden" name="custom_installments[' + index + '][due_date]" value="' + installment.dueDate + '">'
+                );
             });
         }
         
@@ -765,18 +819,18 @@ function formatProductOption(product) {
     }
     
     const productData = product.product;
-    return $(`
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <strong>${productData.name}</strong>
-                <br>
-                <small class="text-muted">${productData.unit}</small>
-            </div>
-            <div class="text-end">
-                <strong class="text-success">R$ ${parseFloat(productData.price).toFixed(2).replace('.', ',')}</strong>
-            </div>
-        </div>
-    `);
+    return $(
+        '<div class="d-flex justify-content-between align-items-center">' +
+            '<div>' +
+                '<strong>' + productData.name + '</strong>' +
+                '<br>' +
+                '<small class="text-muted">' + productData.unit + '</small>' +
+            '</div>' +
+            '<div class="text-end">' +
+                '<strong class="text-success">R$ ' + parseFloat(productData.price).toFixed(2).replace('.', ',') + '</strong>' +
+            '</div>' +
+        '</div>'
+    );
 }
 
 function formatProductSelection(product) {
@@ -859,43 +913,42 @@ function updateSelectedProductsTable() {
     
     let html = '';
     selectedProducts.forEach((product, index) => {
-        html += `
-            <tr>
-                <td>
-                    <div>
-                        <strong>${product.name}</strong>
-                        ${product.description ? `<br><small class="text-muted">${product.description}</small>` : ''}
-                    </div>
-                </td>
-                <td>
-                    <input type="number" 
-                           class="form-control quantity-input" 
-                           value="${product.quantity}" 
-                           min="1" 
-                           onchange="updateQuantity(${index}, this.value)">
-                    <small class="text-muted">${product.unit || 'unidade'}</small>
-                </td>
-                <td>
-                    <input type="number" 
-                           class="form-control price-input" 
-                           value="${product.unit_price.toFixed(2)}" 
-                           step="0.01" 
-                           min="0"
-                           onchange="updatePrice(${index}, this.value)">
-                </td>
-                <td class="text-end">
-                    <strong class="text-success">R$ ${product.total_price.toFixed(2).replace('.', ',')}</strong>
-                </td>
-                <td class="text-center">
-                    <button type="button" 
-                            class="btn-remove-product" 
-                            onclick="removeProduct(${index})"
-                            title="Remover produto">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </td>
-            </tr>
-        `;
+        html += 
+            '<tr>' +
+                '<td>' +
+                    '<div>' +
+                        '<strong>' + product.name + '</strong>' +
+                        (product.description ? '<br><small class="text-muted">' + product.description + '</small>' : '') +
+                    '</div>' +
+                '</td>' +
+                '<td>' +
+                    '<input type="number" ' +
+                           'class="form-control quantity-input" ' +
+                           'value="' + product.quantity + '" ' +
+                           'min="1" ' +
+                           'onchange="updateQuantity(' + index + ', this.value)">' +
+                    '<small class="text-muted">' + (product.unit || 'unidade') + '</small>' +
+                '</td>' +
+                '<td>' +
+                    '<input type="number" ' +
+                           'class="form-control price-input" ' +
+                           'value="' + product.unit_price.toFixed(2) + '" ' +
+                           'step="0.01" ' +
+                           'min="0" ' +
+                           'onchange="updatePrice(' + index + ', this.value)">' +
+                '</td>' +
+                '<td class="text-end">' +
+                    '<strong class="text-success">R$ ' + product.total_price.toFixed(2).replace('.', ',') + '</strong>' +
+                '</td>' +
+                '<td class="text-center">' +
+                    '<button type="button" ' +
+                            'class="btn-remove-product" ' +
+                            'onclick="removeProduct(' + index + ')" ' +
+                            'title="Remover produto">' +
+                        '<i class="fas fa-trash"></i>' +
+                    '</button>' +
+                '</td>' +
+            '</tr>';
     });
     
     tbody.html(html);
@@ -934,8 +987,8 @@ function calculateTotals() {
     const discount = parseFloat($('#discount').val()) || 0;
     const total = subtotal - discount;
     
-    $('#subtotal').text(`R$ ${subtotal.toFixed(2).replace('.', ',')}`);
-    $('#total').text(`R$ ${total.toFixed(2).replace('.', ',')}`);
+    $('#subtotal').text('R$ ' + subtotal.toFixed(2).replace('.', ','));
+    $('#total').text('R$ ' + total.toFixed(2).replace('.', ','));
     
     // Update installments summary if credit card is selected
     if ($('#payment_method').val() === 'cartao_credito') {
@@ -946,19 +999,21 @@ function calculateTotals() {
 function updateInstallmentsSummary() {
     const total = parseFloat($('#total').text().replace('R$ ', '').replace(',', '.')) || 0;
     const installments = parseInt($('#installments').val()) || 1;
-    const installmentValue = total / installments;
     
     const installmentsSummary = $('#installmentsSummary');
     const installmentsInfo = $('#installmentsInfo');
     
     if (total > 0 && installments > 0) {
-        installmentsInfo.text(`${installments}x - R$ ${installmentValue.toFixed(2).replace('.', ',')}`);
-        installmentsSummary.show();
-        
-        // Generate installments if not already generated
-        if (installmentsData.length === 0) {
-            generateInstallments(total, installments);
+        // If we have existing installments data, use the actual total from installments
+        if (installmentsData.length > 0) {
+            const actualTotal = installmentsData.reduce((sum, installment) => sum + installment.amount, 0);
+            installmentsInfo.text(installments + 'x - Total: R$ ' + actualTotal.toFixed(2).replace('.', ','));
+        } else {
+            // Only calculate automatic value if no existing data
+            const installmentValue = total / installments;
+            installmentsInfo.text(installments + 'x - R$ ' + installmentValue.toFixed(2).replace('.', ','));
         }
+        installmentsSummary.show();
     } else {
         installmentsSummary.hide();
         $('#installmentsEditor').hide();
@@ -966,27 +1021,8 @@ function updateInstallmentsSummary() {
 }
 
 function loadExistingInstallments() {
-    if (existingInstallments && existingInstallments.length > 0) {
-        // Set the installments field to the correct number
-        $('#installments').val(existingInstallments.length);
-        
-        // Show installments field if more than 1 installment
-        if (existingInstallments.length > 1) {
-            $('#installmentsField').show();
-        }
-        
-        existingInstallments.forEach(installment => {
-            installmentsData.push({
-                number: installment.installment_number,
-                amount: parseFloat(installment.amount),
-                dueDate: installment.due_date,
-                id: installment.id
-            });
-        });
-        
-        updateInstallmentsSummary();
-        updateInstallmentsSummaryDisplay();
-    }
+    // This function is no longer needed as data is loaded in the main initialization
+    // Keeping it empty to avoid breaking any existing calls
 }
 
 // Installments management
@@ -1003,7 +1039,8 @@ function generateInstallments(total, installments) {
         installmentsData.push({
             number: i,
             amount: baseAmount,
-            dueDate: dueDate.toISOString().split('T')[0]
+            dueDate: dueDate.toISOString().split('T')[0],
+            manuallyEdited: false
         });
     }
     
@@ -1035,35 +1072,40 @@ function updateInstallmentsTable() {
     
     let html = '';
     installmentsData.forEach((installment, index) => {
-        html += `
-            <tr>
-                <td class="text-center">
-                    <strong>${installment.number}</strong>
-                </td>
-                <td>
-                    <input type="number" 
-                           class="form-control form-control-sm installment-amount" 
-                           value="${installment.amount.toFixed(2)}" 
-                           step="0.01" 
-                           min="0"
-                           onchange="updateInstallmentAmount(${index}, this.value)">
-                </td>
-                <td>
-                    <input type="date" 
-                           class="form-control form-control-sm installment-date" 
-                           value="${installment.dueDate}"
-                           onchange="updateInstallmentDate(${index}, this.value)">
-                </td>
-                <td class="text-center">
-                    <button type="button" 
-                            class="btn btn-sm btn-outline-danger" 
-                            onclick="removeInstallment(${index})"
-                            title="Remover parcela">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </td>
-            </tr>
-        `;
+        const isManuallyEdited = installment.manuallyEdited;
+        const rowClass = isManuallyEdited ? 'table-warning' : '';
+        const inputClass = isManuallyEdited ? 'form-control-sm installment-amount border-warning' : 'form-control-sm installment-amount';
+        
+        html += 
+            '<tr class="' + rowClass + '">' +
+                '<td class="text-center">' +
+                    '<strong>' + installment.number + '</strong>' +
+                    (isManuallyEdited ? '<br><small class="text-warning"><i class="fas fa-edit"></i> Editada</small>' : '') +
+                '</td>' +
+                '<td>' +
+                    '<input type="number" ' +
+                           'class="' + inputClass + '" ' +
+                           'value="' + installment.amount.toFixed(2) + '" ' +
+                           'step="0.01" ' +
+                           'min="0" ' +
+                           'onchange="updateInstallmentAmount(' + index + ', this.value)" ' +
+                           'title="' + (isManuallyEdited ? 'Parcela editada manualmente' : 'Clique para editar') + '">' +
+                '</td>' +
+                '<td>' +
+                    '<input type="date" ' +
+                           'class="form-control form-control-sm installment-date" ' +
+                           'value="' + installment.dueDate + '" ' +
+                           'onchange="updateInstallmentDate(' + index + ', this.value)">' +
+                '</td>' +
+                '<td class="text-center">' +
+                    '<button type="button" ' +
+                            'class="btn btn-sm btn-outline-danger" ' +
+                            'onclick="removeInstallment(' + index + ')" ' +
+                            'title="Remover parcela">' +
+                        '<i class="fas fa-trash"></i>' +
+                    '</button>' +
+                '</td>' +
+            '</tr>';
     });
     
     tbody.html(html);
@@ -1074,6 +1116,13 @@ function updateInstallmentAmount(index, amount) {
     if (amount < 0) amount = 0;
     
     installmentsData[index].amount = amount;
+    installmentsData[index].manuallyEdited = true;
+    
+    // Mark all subsequent installments as not manually edited
+    for (let i = index + 1; i < installmentsData.length; i++) {
+        installmentsData[i].manuallyEdited = false;
+    }
+    
     recalculateInstallments();
     updateModalSummary();
 }
@@ -1110,14 +1159,39 @@ function recalculateInstallments() {
     const currentTotal = installmentsData.reduce((sum, installment) => sum + installment.amount, 0);
     
     if (Math.abs(total - currentTotal) > 0.01) {
-        // Distribute the difference proportionally
-        const difference = total - currentTotal;
-        const totalAmount = installmentsData.reduce((sum, installment) => sum + installment.amount, 0);
+        // Find the last manually edited installment
+        let lastEditedIndex = -1;
+        for (let i = installmentsData.length - 1; i >= 0; i--) {
+            if (installmentsData[i].manuallyEdited) {
+                lastEditedIndex = i;
+                break;
+            }
+        }
         
-        installmentsData.forEach(installment => {
-            const proportion = installment.amount / totalAmount;
-            installment.amount += difference * proportion;
-        });
+        // If no manual edits, distribute proportionally
+        if (lastEditedIndex === -1) {
+            const difference = total - currentTotal;
+            const totalAmount = installmentsData.reduce((sum, installment) => sum + installment.amount, 0);
+            
+            installmentsData.forEach(installment => {
+                const proportion = installment.amount / totalAmount;
+                installment.amount += difference * proportion;
+            });
+        } else {
+            // Recalculate from the next installment after the last edited one
+            const difference = total - currentTotal;
+            const remainingInstallments = installmentsData.slice(lastEditedIndex + 1);
+            
+            if (remainingInstallments.length > 0) {
+                const remainingTotal = remainingInstallments.reduce((sum, installment) => sum + installment.amount, 0);
+                
+                remainingInstallments.forEach((installment, index) => {
+                    const proportion = installment.amount / remainingTotal;
+                    const installmentIndex = lastEditedIndex + 1 + index;
+                    installmentsData[installmentIndex].amount += difference * proportion;
+                });
+            }
+        }
         
         updateInstallmentsTable();
     }
@@ -1130,7 +1204,7 @@ function updateInstallmentsSummaryDisplay() {
     if (installmentsData.length > 0) {
         const totalAmount = installmentsData.reduce((sum, installment) => sum + installment.amount, 0);
         const installmentsInfo = $('#installmentsInfo');
-        installmentsInfo.text(`${installmentsData.length}x - Total: R$ ${totalAmount.toFixed(2).replace('.', ',')}`);
+        installmentsInfo.text(installmentsData.length + 'x - Total: R$ ' + totalAmount.toFixed(2).replace('.', ','));
     }
 }
 
@@ -1139,9 +1213,9 @@ function updateModalSummary() {
     const installmentsTotal = installmentsData.reduce((sum, installment) => sum + installment.amount, 0);
     const difference = total - installmentsTotal;
     
-    $('#modalTotalAmount').text(`R$ ${total.toFixed(2).replace('.', ',')}`);
-    $('#modalInstallmentsTotal').text(`R$ ${installmentsTotal.toFixed(2).replace('.', ',')}`);
-    $('#modalDifference').text(`R$ ${difference.toFixed(2).replace('.', ',')}`);
+    $('#modalTotalAmount').text('R$ ' + total.toFixed(2).replace('.', ','));
+    $('#modalInstallmentsTotal').text('R$ ' + installmentsTotal.toFixed(2).replace('.', ','));
+    $('#modalDifference').text('R$ ' + difference.toFixed(2).replace('.', ','));
     
     // Color code the difference
     if (Math.abs(difference) < 0.01) {
@@ -1161,7 +1235,7 @@ function saveInstallments() {
     if (difference > 0.01) {
         Swal.fire({
             title: 'Atenção!',
-            text: `O total das parcelas (R$ ${installmentsTotal.toFixed(2).replace('.', ',')}) não confere com o total da venda (R$ ${total.toFixed(2).replace('.', ',')}). Deseja continuar mesmo assim?`,
+            text: 'O total das parcelas (R$ ' + installmentsTotal.toFixed(2).replace('.', ',') + ') não confere com o total da venda (R$ ' + total.toFixed(2).replace('.', ',') + '). Deseja continuar mesmo assim?',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Sim, continuar',
@@ -1187,6 +1261,38 @@ function closeModal() {
         icon: 'success',
         timer: 1500,
         showConfirmButton: false
+    });
+}
+
+function resetManualEdits() {
+    Swal.fire({
+        title: 'Resetar Edições Manuais',
+        text: 'Tem certeza que deseja resetar todas as edições manuais das parcelas?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, resetar',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const total = parseFloat($('#total').text().replace('R$ ', '').replace(',', '.')) || 0;
+            const baseAmount = total / installmentsData.length;
+            
+            installmentsData.forEach(installment => {
+                installment.amount = baseAmount;
+                installment.manuallyEdited = false;
+            });
+            
+            updateInstallmentsTable();
+            updateModalSummary();
+            
+            Swal.fire({
+                title: 'Resetado!',
+                text: 'Todas as edições manuais foram resetadas.',
+                icon: 'success',
+                timer: 1500,
+                showConfirmButton: false
+            });
+        }
     });
 }
 
@@ -1418,21 +1524,8 @@ function fillDebitCardPayment() {
 }
 
 function ensureInstallmentsFieldCorrect() {
-    // If there are existing installments, make sure the field shows the correct number
-    if (existingInstallments && existingInstallments.length > 0) {
-        const installmentCount = existingInstallments.length;
-        
-        // Set the installments field to the correct number
-        $('#installments').val(installmentCount);
-        
-        // If it's more than 1 installment, show the field
-        if (installmentCount > 1) {
-            $('#installmentsField').show();
-        }
-        
-        // Update the summary
-        updateInstallmentsSummary();
-    }
+    // This function is no longer needed as data is loaded in the main initialization
+    // Keeping it empty to avoid breaking any existing calls
 }
 
 function addInstallment() {
