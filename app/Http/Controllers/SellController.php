@@ -24,7 +24,7 @@ class SellController extends Controller
             $totalSells = Sell::count();
             $todaySells = Sell::whereDate('sale_date', today())->count();
             $totalValue = Sell::sum('total_amount');
-            $pendingSells = Sell::where('status', 'pending')->count();
+            $pendingSells = Sell::where('payment_status', 'pending')->count();
 
             return view('sells.index', compact(
                 'sells',

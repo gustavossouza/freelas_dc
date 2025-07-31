@@ -53,7 +53,7 @@
 
                 <!-- Search and Filters -->
                 <div class="row mb-4">
-                    <div class="col-md-4">
+                    <div class="col-md-4 col-sm-12 mb-2">
                         <div class="input-group">
                             <span class="input-group-text">
                                 <i class="fas fa-search"></i>
@@ -61,7 +61,7 @@
                             <input type="text" id="searchInput" class="form-control" placeholder="Buscar produtos...">
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-3 col-sm-6 mb-2">
                         <select class="form-select" id="statusFilter">
                             <option value="">Todos os Status</option>
                             <option value="active">Ativos</option>
@@ -69,10 +69,17 @@
                         </select>
                     </div>
 
-                    <div class="col-md-2">
+                    <div class="col-md-2 col-sm-3 mb-2">
                         <button class="btn btn-outline-secondary w-100" onclick="exportProducts()">
                             <i class="fas fa-download me-1"></i>
                             Exportar
+                        </button>
+                    </div>
+                    
+                    <div class="col-md-2 col-sm-3 mb-2">
+                        <button class="btn btn-outline-danger w-100" onclick="clearFilters()">
+                            <i class="fas fa-times me-1"></i>
+                            Limpar
                         </button>
                     </div>
                 </div>
@@ -227,29 +234,38 @@
         border: none;
         border-radius: 12px;
     }
+    
+    #resultsCounter {
+        border-radius: 12px;
+        border: none;
+        background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+        color: #1565c0;
+        font-weight: 500;
+    }
+    
+    #resultsCounter i {
+        color: #1976d2;
+    }
 </style>
 @endsection
 
 @section('scripts')
 <!-- SweetAlert2 JS -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+<!-- jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+<!-- XLSX -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 $(document).ready(function() {
     // Search functionality
     $('#searchInput').on('keyup', function() {
-        const value = $(this).val().toLowerCase();
-        $('#productsTable tbody tr').filter(function() {
-            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
-        });
+        filterTable();
     });
     
     // Status filter
     $('#statusFilter').on('change', function() {
-        filterTable();
-    });
-    
-    // Stock filter
-    $('#stockFilter').on('change', function() {
         filterTable();
     });
     
@@ -266,35 +282,280 @@ $(document).ready(function() {
 });
 
 function filterTable() {
-    const status = $('#statusFilter').val();
-    const stock = $('#stockFilter').val();
+    const searchValue = $('#searchInput').val().toLowerCase();
+    const statusFilter = $('#statusFilter').val();
     
     $('#productsTable tbody tr').each(function() {
         const row = $(this);
-        const statusText = row.find('td:nth-child(6) .badge').first().text().toLowerCase();
-        const stockText = row.find('td:nth-child(6) .badge').last().text().toLowerCase();
-        
         let showRow = true;
         
-        if (status) {
-            if (status === 'active' && !statusText.includes('ativo')) {
+        // Filtro de busca (nome e descrição)
+        if (searchValue) {
+            const productName = row.find('td:nth-child(2) h6').text().toLowerCase();
+            const productDescription = row.find('td:nth-child(2) small').text().toLowerCase();
+            const productText = productName + ' ' + productDescription;
+            
+            if (!productText.includes(searchValue)) {
                 showRow = false;
-            } else if (status === 'inactive' && !statusText.includes('inativo')) {
+            }
+        }
+        
+        // Filtro de status
+        if (statusFilter && showRow) {
+            const statusText = row.find('td:nth-child(5) .badge').text().toLowerCase();
+            
+            if (statusFilter === 'active' && !statusText.includes('ativo')) {
+                showRow = false;
+            } else if (statusFilter === 'inactive' && !statusText.includes('inativo')) {
                 showRow = false;
             }
         }
         
         row.toggle(showRow);
     });
+    
+    // Atualizar contador de resultados
+    updateResultsCounter();
+}
+
+function updateResultsCounter() {
+    const visibleCount = $('#productsTable tbody tr:visible').length;
+    const totalCount = $('#productsTable tbody tr').length;
+    
+    // Se houver filtros ativos, mostrar contador
+    const hasFilters = $('#searchInput').val() || $('#statusFilter').val();
+    
+    if (hasFilters) {
+        if (!$('#resultsCounter').length) {
+            $('#productsTable').before('<div id="resultsCounter" class="alert alert-info mb-3"><i class="fas fa-info-circle me-2"></i><span></span></div>');
+        }
+        $('#resultsCounter span').text(`${visibleCount} de ${totalCount} produtos encontrados`);
+        $('#resultsCounter').show();
+    } else {
+        $('#resultsCounter').hide();
+    }
+}
+
+function clearFilters() {
+    $('#searchInput').val('');
+    $('#statusFilter').val('');
+    filterTable();
+    
+    Swal.fire({
+        title: 'Filtros Limpos!',
+        text: 'Todos os filtros foram removidos.',
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false
+    });
 }
 
 function exportProducts() {
+    Swal.fire({
+        title: 'Exportar Produtos',
+        text: 'Escolha o formato de exportação:',
+        icon: 'question',
+        showCancelButton: true,
+        showDenyButton: true,
+        showConfirmButton: true,
+        confirmButtonText: 'PDF',
+        denyButtonText: 'Excel',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#dc3545',
+        denyButtonColor: '#28a745'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            exportProductsToPDF();
+        } else if (result.isDenied) {
+            exportProductsToExcel();
+        }
+    });
+}
+
+function exportProductsToPDF() {
     showLoading();
-    // TODO: Implement export functionality
-    setTimeout(() => {
+    
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        // Título
+        doc.setFontSize(18);
+        doc.text('Relatório de Produtos', 14, 22);
+        
+        // Data de geração
+        doc.setFontSize(10);
+        doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 32);
+        
+        // Filtros aplicados
+        const filters = [];
+        if ($('#searchInput').val()) filters.push(`Busca: ${$('#searchInput').val()}`);
+        if ($('#statusFilter').val()) filters.push(`Status: ${$('#statusFilter option:selected').text()}`);
+        
+        if (filters.length > 0) {
+            doc.text(`Filtros: ${filters.join(', ')}`, 14, 42);
+        }
+        
+        // Dados da tabela
+        const tableData = [];
+        const headers = ['ID', 'Produto', 'Preço', 'Unidade', 'Status'];
+        
+        $('#productsTable tbody tr:visible').each(function() {
+            const row = [];
+            const cells = $(this).find('td');
+            
+            // ID
+            row.push($(cells[0]).text().trim());
+            
+            // Produto
+            row.push($(cells[1]).find('h6').text().trim());
+            
+            // Preço
+            row.push($(cells[2]).find('strong').text().trim());
+            
+            // Unidade
+            row.push($(cells[3]).find('strong').text().trim());
+            
+            // Status
+            row.push($(cells[4]).find('.badge').text().trim());
+            
+            tableData.push(row);
+        });
+        
+        // Adicionar tabela
+        doc.autoTable({
+            head: [headers],
+            body: tableData,
+            startY: 50,
+            styles: {
+                fontSize: 8,
+                cellPadding: 2
+            },
+            headStyles: {
+                fillColor: [99, 102, 241],
+                textColor: 255
+            },
+            alternateRowStyles: {
+                fillColor: [248, 249, 250]
+            }
+        });
+        
+        // Salvar PDF
+        const fileName = `produtos_${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(fileName);
+        
         hideLoading();
-        alert('Funcionalidade de exportação será implementada em breve!');
-    }, 1000);
+        Swal.fire({
+            title: 'Sucesso!',
+            text: 'Relatório PDF exportado com sucesso!',
+            icon: 'success',
+            confirmButtonText: 'OK'
+        });
+        
+    } catch (error) {
+        hideLoading();
+        console.error('Erro ao gerar PDF:', error);
+        Swal.fire({
+            title: 'Erro!',
+            text: 'Erro ao gerar PDF. Verifique o console para mais detalhes.',
+            icon: 'error',
+            confirmButtonText: 'OK'
+        });
+    }
+}
+
+function exportProductsToExcel() {
+    showLoading();
+    
+    try {
+        // Preparar dados
+        const data = [];
+        const headers = ['ID', 'Produto', 'Descrição', 'Preço', 'Unidade', 'Status'];
+        
+        $('#productsTable tbody tr:visible').each(function() {
+            const row = {};
+            const cells = $(this).find('td');
+            
+            // ID
+            row['ID'] = $(cells[0]).text().trim();
+            
+            // Produto
+            row['Produto'] = $(cells[1]).find('h6').text().trim();
+            
+            // Descrição
+            const description = $(cells[1]).find('small').text().trim();
+            row['Descrição'] = description || '-';
+            
+            // Preço
+            row['Preço'] = $(cells[2]).find('strong').text().trim();
+            
+            // Unidade
+            row['Unidade'] = $(cells[3]).find('strong').text().trim();
+            
+            // Status
+            row['Status'] = $(cells[4]).find('.badge').text().trim();
+            
+            data.push(row);
+        });
+        
+        // Criar workbook
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(data);
+        
+        // Configurar largura das colunas
+        const colWidths = [
+            { wch: 8 },   // ID
+            { wch: 30 },  // Produto
+            { wch: 40 },  // Descrição
+            { wch: 15 },  // Preço
+            { wch: 12 },  // Unidade
+            { wch: 15 }   // Status
+        ];
+        ws['!cols'] = colWidths;
+        
+        // Adicionar worksheet ao workbook
+        XLSX.utils.book_append_sheet(wb, ws, 'Produtos');
+        
+        // Adicionar informações de filtros
+        const filterInfo = [];
+        if ($('#searchInput').val()) filterInfo.push(`Busca: ${$('#searchInput').val()}`);
+        if ($('#statusFilter').val()) filterInfo.push(`Status: ${$('#statusFilter option:selected').text()}`);
+        
+        if (filterInfo.length > 0) {
+            const filterWs = XLSX.utils.aoa_to_sheet([
+                ['Relatório de Produtos'],
+                [''],
+                ['Informações do Relatório:'],
+                [`Data de Geração: ${new Date().toLocaleDateString('pt-BR')}`],
+                [`Filtros Aplicados: ${filterInfo.join(', ')}`],
+                [''],
+                ['Total de Produtos:', data.length]
+            ]);
+            XLSX.utils.book_append_sheet(wb, filterWs, 'Informações');
+        }
+        
+        // Salvar arquivo
+        const fileName = `produtos_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+        
+        hideLoading();
+        Swal.fire({
+            title: 'Sucesso!',
+            text: 'Relatório Excel exportado com sucesso!',
+            icon: 'success',
+            confirmButtonText: 'OK'
+        });
+        
+    } catch (error) {
+        hideLoading();
+        console.error('Erro ao gerar Excel:', error);
+        Swal.fire({
+            title: 'Erro!',
+            text: 'Erro ao gerar Excel. Verifique o console para mais detalhes.',
+            icon: 'error',
+            confirmButtonText: 'OK'
+        });
+    }
 }
 
 function confirmDeleteProduct(productId, productName) {

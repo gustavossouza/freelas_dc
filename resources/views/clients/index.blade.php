@@ -306,6 +306,11 @@
 @section('scripts')
 <!-- SweetAlert2 JS -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+<!-- jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+<!-- XLSX -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 $(document).ready(function() {
     // Search functionality
@@ -349,12 +354,234 @@ function filterTable() {
 }
 
 function exportClients() {
+    Swal.fire({
+        title: 'Exportar Clientes',
+        text: 'Escolha o formato de exportação:',
+        icon: 'question',
+        showCancelButton: true,
+        showDenyButton: true,
+        showConfirmButton: true,
+        confirmButtonText: 'PDF',
+        denyButtonText: 'Excel',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#dc3545',
+        denyButtonColor: '#28a745'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            exportClientsToPDF();
+        } else if (result.isDenied) {
+            exportClientsToExcel();
+        }
+    });
+}
+
+function exportClientsToPDF() {
     showLoading();
-    // TODO: Implement export functionality
-    setTimeout(() => {
+    
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        // Título
+        doc.setFontSize(18);
+        doc.text('Relatório de Clientes', 14, 22);
+        
+        // Data de geração
+        doc.setFontSize(10);
+        doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 32);
+        
+        // Filtros aplicados
+        const filters = [];
+        if ($('#searchInput').val()) filters.push(`Busca: ${$('#searchInput').val()}`);
+        if ($('#stateFilter').val()) filters.push(`Estado: ${$('#stateFilter option:selected').text()}`);
+        
+        if (filters.length > 0) {
+            doc.text(`Filtros: ${filters.join(', ')}`, 14, 42);
+        }
+        
+        // Dados da tabela
+        const tableData = [];
+        const headers = ['ID', 'Cliente', 'Contato', 'Endereço', 'Vendas', 'Receita'];
+        
+        $('#clientsTable tbody tr:visible').each(function() {
+            const row = [];
+            const cells = $(this).find('td');
+            
+            // ID
+            row.push($(cells[0]).text().trim());
+            
+            // Cliente
+            row.push($(cells[1]).find('h6').text().trim());
+            
+            // Contato (Email e Telefone)
+            const email = $(cells[2]).find('div:first').text().trim();
+            const phone = $(cells[2]).find('div:last').text().trim();
+            row.push(`${email} ${phone}`.trim());
+            
+            // Endereço
+            const address = $(cells[3]).find('div:first').text().trim();
+            const cityState = $(cells[3]).find('small').text().trim();
+            row.push(`${address} ${cityState}`.trim());
+            
+            // Vendas
+            const salesText = $(cells[4]).find('.badge').text().trim();
+            row.push(salesText);
+            
+            // Receita
+            const revenueText = $(cells[5]).find('strong').text().trim();
+            row.push(revenueText);
+            
+            tableData.push(row);
+        });
+        
+        // Adicionar tabela
+        doc.autoTable({
+            head: [headers],
+            body: tableData,
+            startY: 50,
+            styles: {
+                fontSize: 8,
+                cellPadding: 2
+            },
+            headStyles: {
+                fillColor: [99, 102, 241],
+                textColor: 255
+            },
+            alternateRowStyles: {
+                fillColor: [248, 249, 250]
+            }
+        });
+        
+        // Salvar PDF
+        const fileName = `clientes_${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(fileName);
+        
         hideLoading();
-        alert('Funcionalidade de exportação será implementada em breve!');
-    }, 1000);
+        Swal.fire({
+            title: 'Sucesso!',
+            text: 'Relatório PDF exportado com sucesso!',
+            icon: 'success',
+            confirmButtonText: 'OK'
+        });
+        
+    } catch (error) {
+        hideLoading();
+        console.error('Erro ao gerar PDF:', error);
+        Swal.fire({
+            title: 'Erro!',
+            text: 'Erro ao gerar PDF. Verifique o console para mais detalhes.',
+            icon: 'error',
+            confirmButtonText: 'OK'
+        });
+    }
+}
+
+function exportClientsToExcel() {
+    showLoading();
+    
+    try {
+        // Preparar dados
+        const data = [];
+        const headers = ['ID', 'Cliente', 'Email', 'Telefone', 'Endereço', 'Cidade', 'Estado', 'Vendas', 'Receita Total'];
+        
+        $('#clientsTable tbody tr:visible').each(function() {
+            const row = {};
+            const cells = $(this).find('td');
+            
+            // ID
+            row['ID'] = $(cells[0]).text().trim();
+            
+            // Cliente
+            row['Cliente'] = $(cells[1]).find('h6').text().trim();
+            
+            // Email
+            const email = $(cells[2]).find('div:first').text().trim();
+            row['Email'] = email.replace(/[📧✉️]/g, '').replace(/\s+/g, ' ').trim();
+            
+            // Telefone
+            const phone = $(cells[2]).find('div:last').text().trim();
+            row['Telefone'] = phone.replace(/[📞📱]/g, '').replace(/\s+/g, ' ').trim();
+            
+            // Endereço
+            const address = $(cells[3]).find('div:first').text().trim();
+            row['Endereço'] = address || '-';
+            
+            // Cidade e Estado
+            const cityState = $(cells[3]).find('small').text().trim();
+            const cityMatch = cityState.match(/(.+?),\s*([A-Z]{2})/);
+            row['Cidade'] = cityMatch ? cityMatch[1].trim() : cityState;
+            row['Estado'] = cityMatch ? cityMatch[2].trim() : '-';
+            
+            // Vendas
+            row['Vendas'] = $(cells[4]).find('.badge').text().trim();
+            
+            // Receita Total
+            row['Receita Total'] = $(cells[5]).find('strong').text().trim();
+            
+            data.push(row);
+        });
+        
+        // Criar workbook
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(data);
+        
+        // Configurar largura das colunas
+        const colWidths = [
+            { wch: 8 },   // ID
+            { wch: 30 },  // Cliente
+            { wch: 30 },  // Email
+            { wch: 15 },  // Telefone
+            { wch: 25 },  // Endereço
+            { wch: 20 },  // Cidade
+            { wch: 10 },  // Estado
+            { wch: 12 },  // Vendas
+            { wch: 20 }   // Receita Total
+        ];
+        ws['!cols'] = colWidths;
+        
+        // Adicionar worksheet ao workbook
+        XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
+        
+        // Adicionar informações de filtros
+        const filterInfo = [];
+        if ($('#searchInput').val()) filterInfo.push(`Busca: ${$('#searchInput').val()}`);
+        if ($('#stateFilter').val()) filterInfo.push(`Estado: ${$('#stateFilter option:selected').text()}`);
+        
+        if (filterInfo.length > 0) {
+            const filterWs = XLSX.utils.aoa_to_sheet([
+                ['Relatório de Clientes'],
+                [''],
+                ['Informações do Relatório:'],
+                [`Data de Geração: ${new Date().toLocaleDateString('pt-BR')}`],
+                [`Filtros Aplicados: ${filterInfo.join(', ')}`],
+                [''],
+                ['Total de Clientes:', data.length]
+            ]);
+            XLSX.utils.book_append_sheet(wb, filterWs, 'Informações');
+        }
+        
+        // Salvar arquivo
+        const fileName = `clientes_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+        
+        hideLoading();
+        Swal.fire({
+            title: 'Sucesso!',
+            text: 'Relatório Excel exportado com sucesso!',
+            icon: 'success',
+            confirmButtonText: 'OK'
+        });
+        
+    } catch (error) {
+        hideLoading();
+        console.error('Erro ao gerar Excel:', error);
+        Swal.fire({
+            title: 'Erro!',
+            text: 'Erro ao gerar Excel. Verifique o console para mais detalhes.',
+            icon: 'error',
+            confirmButtonText: 'OK'
+        });
+    }
 }
 
 function confirmDeleteClient(clientId, clientName) {
